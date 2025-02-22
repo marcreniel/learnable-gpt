@@ -32,10 +32,15 @@ class CausalSelfAttention(nn.Module):
     return proj
 
   def attention(self, key, query, value, attention_mask):
-
     ### YOUR CODE HERE
-    raise NotImplementedError
+    A = torch.matmul(query, key.transpose(-1, -2)) / (self.attention_head_size ** 0.5)
+    A += attention_mask
+    A = torch.softmax(A, dim=-1)
+    A = self.dropout(A)
+    A = torch.matmul(A, value)
+    A = rearrange(A, 'b h t d -> b t (h d)')
 
+    return A
 
   def forward(self, hidden_states, attention_mask):
     """
