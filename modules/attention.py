@@ -21,6 +21,9 @@ class CausalSelfAttention(nn.Module):
     # observe that it yields better performance.
     self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
+    # Initialize Causal Mask as buffer
+    self.register_buffer("causal_mask", torch.tril(torch.ones(config.max_position_embeddings, config.max_position_embeddings)).view(1, 1, config.max_position_embeddings, config.max_position_embeddings)) #T is the maximum length of input sequences (in tokens)
+
   def transform(self, x, linear_layer):
     # The corresponding linear_layer of k, v, q are used to project the hidden_state (x).
     proj = linear_layer(x)
@@ -32,10 +35,22 @@ class CausalSelfAttention(nn.Module):
     return proj
 
   def attention(self, key, query, value, attention_mask):
-
     ### YOUR CODE HERE
-    raise NotImplementedError
+    # Attention equation
+    A = torch.matmul(query, key.transpose(-1, -2)) / (self.attention_head_size ** 0.5)
 
+    # Apply the attention mask to the attention scores
+    _, _, T, _ = query.shape
+    causal_mask = self.causal_mask[:, :, :T, :T]
+    A = A.masked_fill(causal_mask[:,:,:T,:T] == 0, float('-inf'))
+
+    # Apply softmax, dropout, multiply by value, rearrange and return
+    A = torch.softmax(A, dim=-1)
+    A = self.dropout(A)
+    A = torch.matmul(A, value)
+    A = rearrange(A, 'b h t d -> b t (h d)')
+
+    return A
 
   def forward(self, hidden_states, attention_mask):
     """
