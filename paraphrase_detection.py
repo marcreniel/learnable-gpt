@@ -73,9 +73,12 @@ class ParaphraseGPT(nn.Module):
     'Takes a batch of sentences and produces embeddings for them.'
     ### YOUR CODE HERE
     # Grab hidden state, take the last hidden state, then pass through paraphrase detection head
-    hidden_states = self.gpt(input_ids, attention_mask)
-    last_hidden_state = hidden_states[:, -1, :]
-    logits = self.paraphrase_detection_head(last_hidden_state)
+    hidden_states = self.gpt(input_ids, attention_mask)['last_hidden_state']
+    logits = self.paraphrase_detection_head(hidden_states[:, -1, :])
+    # print(logits)
+    # logits = torch.tensor([1 for _ in range(8505)] * 8)
+    # logits[3919] = 1
+    # logits = self.gpt.hidden_state_to_token(logits)
     return logits
 
 
@@ -132,7 +135,8 @@ def train(args):
       optimizer.zero_grad()
       logits = model(b_ids, b_mask)
       preds = torch.argmax(logits, dim=1)
-      loss = F.cross_entropy(logits, labels, reduction='mean')
+      mapped_labels = (labels == 8505).long()
+      loss = F.cross_entropy(logits, mapped_labels, reduction='mean')
       loss.backward()
       optimizer.step()
 
