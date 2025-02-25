@@ -65,8 +65,13 @@ class GPT2SentimentClassifier(torch.nn.Module):
     ###       the training loop currently uses F.cross_entropy as the loss function.
     ### YOUR CODE HERE
     outputs = self.gpt(input_ids, attention_mask)
-    cls_hidden_state = outputs['last_hidden_state'][:, 0, :]
-    logits = self.classifier(cls_hidden_state).view(-1, self.num_labels)
+    last_hidden_state = outputs['last_hidden_state']
+    # Get the index of the last non-padding token for each sequence in the batch
+    last_token_index = torch.sum(attention_mask, dim=1) - 1 
+    # Gather the last token hidden states
+    batch_size = last_hidden_state.shape[0]
+    last_token_hidden_states = last_hidden_state[torch.arange(batch_size), last_token_index, :]
+    logits = self.classifier(last_token_hidden_states).view(-1, self.num_labels)
     return logits
 
 class SentimentDataset(Dataset):
