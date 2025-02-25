@@ -55,6 +55,7 @@ class GPT2SentimentClassifier(torch.nn.Module):
 
     ### TODO: Create any instance variables you need to classify the sentiment of BERT embeddings.
     ### YOUR CODE HERE
+    self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
     self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
 
   def forward(self, input_ids, attention_mask):
@@ -63,15 +64,20 @@ class GPT2SentimentClassifier(torch.nn.Module):
     ### TODO: The final GPT contextualized embedding is the hidden state of [CLS] token (the first token).
     ###       HINT: You should consider what is an appropriate return value given that
     ###       the training loop currently uses F.cross_entropy as the loss function.
-    ### YOUR CODE HERE
-    outputs = self.gpt(input_ids, attention_mask)
-    last_hidden_state = outputs['last_hidden_state']
-    # Get the index of the last non-padding token for each sequence in the batch
-    last_token_index = torch.sum(attention_mask, dim=1) - 1 
-    # Gather the last token hidden states
-    batch_size = last_hidden_state.shape[0]
-    last_token_hidden_states = last_hidden_state[torch.arange(batch_size), last_token_index, :]
-    logits = self.classifier(last_token_hidden_states).view(-1, self.num_labels)
+    ### YOUR CODE HERE    
+    outputs = self.gpt(input_ids=input_ids, attention_mask=attention_mask) 
+    last_hidden_states = outputs['last_hidden_state']
+    
+    # Compute the index of the last non-padding token for each sequence. 
+    last_token_indices = attention_mask.sum(dim=1) - 1 # (batch_size,) 
+
+    # Gather the last token hidden state for each sequence. 
+    batch_size = last_hidden_states.shape[0] 
+    last_token_hidden = last_hidden_states[torch.arange(batch_size), last_token_indices] 
+    
+    # Pass through dropout and classification head. 
+    logits = self.classifier(self.dropout(last_token_hidden))
+
     return logits
 
 class SentimentDataset(Dataset):
