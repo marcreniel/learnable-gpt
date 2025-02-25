@@ -30,6 +30,7 @@ class GPT2Layer(nn.Module):
         IN THIS FUNCTION.
     """
     ### YOUR CODE HERE
+    # Apply dense layer, dropout, and add input
     output = dense_layer(output)
     output = dropout(output)
     output = input + output
@@ -44,10 +45,12 @@ class GPT2Layer(nn.Module):
            - A feed-forward layer that applies transformations to further refine the hidden states.
     """
     ### YOUR CODE HERE
+    # Apply layer norm to hidden_states and pass through self-attention, then add dropout
     norm_a = self.attention_layer_norm(hidden_states)
     attn_output = self.self_attention(norm_a, attention_mask)
     hidden_states = self.add(hidden_states, attn_output, self.attention_dense, self.attention_dropout)
 
+    # Apply layer norm to hidden_states and pass through feed-forward layer, then add dropout and return
     norm_ff = self.out_layer_norm(hidden_states)
     ff_intermediate = self.interm_dense(norm_ff)
     ff_activated = self.interm_af(ff_intermediate)

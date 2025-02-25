@@ -36,7 +36,7 @@ class CausalSelfAttention(nn.Module):
 
   def attention(self, key, query, value, attention_mask):
     ### YOUR CODE HERE
-
+    # Attention equation
     A = torch.matmul(query, key.transpose(-1, -2)) / (self.attention_head_size ** 0.5)
 
     # Apply the attention mask to the attention scores
@@ -44,6 +44,7 @@ class CausalSelfAttention(nn.Module):
     causal_mask = self.causal_mask[:, :, :T, :T]
     A = A.masked_fill(causal_mask[:,:,:T,:T] == 0, float('-inf'))
 
+    # Apply softmax, dropout, multiply by value, rearrange and return
     A = torch.softmax(A, dim=-1)
     A = self.dropout(A)
     A = torch.matmul(A, value)

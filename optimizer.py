@@ -60,24 +60,31 @@ class AdamW(Optimizer):
                 ###
                 ###       Refer to the default project handout for more details.
                 ### YOUR CODE HERE
+
+                # Get the hyperparameters
                 b_1, b_2 = group["betas"]
                 eps = group["eps"]
                 weight_decay = group["weight_decay"]
                 correct_bias = group["correct_bias"]
 
+                # Initialize the state if it is the first time
                 if len(state) == 0:
                     state["step"] = 0
                     state["exp_avg"] = torch.zeros_like(p.data)
                     state["exp_avg_sq"] = torch.zeros_like(p.data)
 
+                # Update step count
                 state["step"] += 1
                 step = state["step"]
 
+                # Get the exponential moving averages
                 exp_avg, exp_avg_sq = state["exp_avg"], state["exp_avg_sq"]
 
+                # Update the exponential moving averages with the gradient
                 exp_avg.mul_(b_1).add_(grad, alpha=1 - b_1)
                 exp_avg_sq.mul_(b_2).addcmul_(grad, grad, value=1 - b_2)
 
+                # Apply bias correction if necessary
                 if correct_bias:
                     bias_correction1 = 1 - b_1 ** step
                     bias_correction2 = 1 - b_2 ** step
@@ -88,8 +95,10 @@ class AdamW(Optimizer):
                     denominator = exp_avg_sq.sqrt().add_(eps)
                     step_size = alpha
 
+                # Update the parameters
                 p.data.addcdiv_(exp_avg, denominator, value=-step_size)
 
+                # Apply weight decay if specified
                 if weight_decay != 0.0:
                     p.data.add_(p.data, alpha=-weight_decay * alpha)
 
