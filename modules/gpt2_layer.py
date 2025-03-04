@@ -59,8 +59,14 @@ class GPT2Layer(nn.Module):
     # Apply layer norm to hidden_states and pass through eithen KAN or ff layer, then add dropout and return
     norm_ff = self.out_layer_norm(hidden_states)
     if hasattr(self, "kan_layer"):
-        ff_output = self.kan_layer(norm_ff)
+      # Preserve original shape
+      batch_size, seq_len, hidden_dim = norm_ff.shape
+      # Process flattened sequence
+      flat_norm = norm_ff.view(-1, hidden_dim)
+      ff_output = self.kan_layer(flat_norm)
+      # Restore original 3D shape
+      ff_output = ff_output.view(batch_size, seq_len, hidden_dim)
     else:
-        ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
+      ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
     hidden_states = self.add(hidden_states, ff_output, lambda x: x, self.out_dropout)
     return hidden_states
