@@ -43,8 +43,11 @@ class GPT2SentimentClassifier(torch.nn.Module):
   def __init__(self, config):
     super(GPT2SentimentClassifier, self).__init__()
     self.num_labels = config.num_labels
-    self.gpt = GPT2Model.from_pretrained()
-
+    self.gpt = GPT2Model.from_pretrained(
+        use_kan=config.use_kan,
+        kan_degree=config.kan_degree
+    )
+    
     # Pretrain mode does not require updating GPT paramters.
     assert config.fine_tune_mode in ["last-linear-layer", "full-model"]
     for param in self.gpt.parameters():
@@ -270,7 +273,9 @@ def train(args):
             'num_labels': num_labels,
             'hidden_size': 768,
             'data_dir': '.',
-            'fine_tune_mode': args.fine_tune_mode}
+            'fine_tune_mode': args.fine_tune_mode,
+            'use_kan': args.use_kan,
+            'kan_degree': args.kan_degree}
 
   config = SimpleNamespace(**config)
 
@@ -367,6 +372,9 @@ def get_args():
   parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
   parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                       default=1e-3)
+  # New flags to enable ChebyKAN layer
+  parser.add_argument("--use_kan", action="store_true", help="Use ChebyKAN layer instead of MLP")
+  parser.add_argument("--kan_degree", type=int, default=8, help="Degree for ChebyKAN layer")
 
   args = parser.parse_args()
   return args
@@ -388,6 +396,9 @@ if __name__ == "__main__":
     dev='data/ids-sst-dev.csv',
     test='data/ids-sst-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
+    # New flags to enable ChebyKAN layer
+    use_kan=args.use_kan,       
+    kan_degree=args.kan_degree,
     dev_out='predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-sst-test-out.csv'
   )

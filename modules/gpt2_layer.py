@@ -16,8 +16,10 @@ class GPT2Layer(nn.Module):
     self.attention_dropout = nn.Dropout(config.hidden_dropout_prob)
     # KAN network (if used).
     if getattr(config, "use_kan", False):
+      print("Using ChebyKAN")
       self.kan_layer = ChebyKANLayer(config.hidden_size, config.hidden_size, getattr(config, "kan_degree", 8))
     else:
+      print("Using FF")
       # Feed forward.
       self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
       self.interm_af = F.gelu
