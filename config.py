@@ -206,6 +206,8 @@ class GPT2Config(PretrainedConfig):
           gradient_checkpointing=False,
           position_embedding_type="learnable",
           use_cache=True,
+          use_kan=False,
+          kan_degree=8,
           **kwargs
   ):
     super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -225,6 +227,7 @@ class GPT2Config(PretrainedConfig):
     self.gradient_checkpointing = gradient_checkpointing
     self.position_embedding_type = position_embedding_type
     self.use_cache = use_cache
-
+    self.use_kan = use_kan
+    self.kan_degree = kan_degree
 
 
