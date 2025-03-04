@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from modules.attention import CausalSelfAttention
+from modules.chebykan_layer import ChebyKANLayer
 
 class GPT2Layer(nn.Module):
   def __init__(self, config):
@@ -13,11 +14,15 @@ class GPT2Layer(nn.Module):
     self.attention_dense = nn.Linear(config.hidden_size, config.hidden_size)
     self.attention_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
     self.attention_dropout = nn.Dropout(config.hidden_dropout_prob)
-    # Feed forward.
-    self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
-    self.interm_af = F.gelu
-    # Add-norm for feed forward.
-    self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
+    # KAN network (if used).
+    if getattr(config, "use_kan", False):
+      self.kan_layer = ChebyKANLayer(config.hidden_size, config.hidden_size, getattr(config, "kan_degree", 8))
+    else:
+      # Feed forward.
+      self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
+      self.interm_af = F.gelu
+      # Add-norm for feed forward.
+      self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
     self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
     self.out_dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -49,12 +54,11 @@ class GPT2Layer(nn.Module):
     norm_a = self.attention_layer_norm(hidden_states)
     attn_output = self.self_attention(norm_a, attention_mask)
     hidden_states = self.add(hidden_states, attn_output, self.attention_dense, self.attention_dropout)
-
-    # Apply layer norm to hidden_states and pass through feed-forward layer, then add dropout and return
+    # Apply layer norm to hidden_states and pass through eithen KAN or ff layer, then add dropout and return
     norm_ff = self.out_layer_norm(hidden_states)
-    ff_intermediate = self.interm_dense(norm_ff)
-    ff_activated = self.interm_af(ff_intermediate)
-    ff_output = self.out_dense(ff_activated)
+    if hasattr(self, "kan_layer"):
+        ff_output = self.kan_layer(norm_ff)
+    else:
+        ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
     hidden_states = self.add(hidden_states, ff_output, lambda x: x, self.out_dropout)
-    
     return hidden_states
