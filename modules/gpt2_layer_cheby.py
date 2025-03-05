@@ -1,68 +1,65 @@
 from torch import nn
 import torch.nn.functional as F
 from modules.attention import CausalSelfAttention
-from modules.efficientkan_layer import KAN 
+from modules.chebykan_layer import ChebyKANLayer
 
 class GPT2Layer(nn.Module):
     def __init__(self, config):
         super().__init__()
-        # Multi-head attention.
+        # Multi-head attention sub-layer.
         self.self_attention = CausalSelfAttention(config)
-        # Add-norm for multi-head attention.
         self.attention_dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.attention_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.attention_dropout = nn.Dropout(config.hidden_dropout_prob)
-
-        # KAN network (if enabled).
+        
+        # Use ChebyKANLayer if configured, otherwise use a feed-forward (FF) network.
         if getattr(config, "use_kan", False):
-            print("Using new KAN implementation")
-            # Construct a KAN network that maps from hidden_size to hidden_size.
-            # The layers_hidden list defines the architecture: input, hidden, and output dimensions.
-            self.kan_layer = KAN(layers_hidden=[config.hidden_size, getattr(config, "kan_degree", 8), config.hidden_size])
+            print("Using ChebyKAN")
+            self.kan_layer = ChebyKANLayer(config.hidden_size, config.intermediate_size, getattr(config, "kan_degree", 8))
+            # If the ChebyKANLayer output dimension differs from hidden_size,
+            # add a projection layer to map it back.
+            if config.intermediate_size != config.hidden_size:
+                self.kan_projection = nn.Linear(config.intermediate_size, config.hidden_size)
+            else:
+                self.kan_projection = None
         else:
-            print("Using feed forward network")
-            # Feed forward block.
+            print("Using FF")
+            # Standard feed-forward network components.
             self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
             self.interm_af = F.gelu
-            # Add-norm for feed forward.
             self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
-            
+
         self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.out_dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def add(self, input, output, dense_layer, dropout):
         """
-        Helper method:
-        - Applies a dense layer followed by dropout,
-        - And adds the result back to the input (residual connection).
+        Helper method to apply a dense transformation, dropout, 
+        and subsequently add the transformed output back to the input.
+        Note that this does not apply layer normalization.
         """
         output = dense_layer(output)
         output = dropout(output)
         return input + output
 
     def forward(self, hidden_states, attention_mask):
-        """
-        Forward pass of the GPT-2 layer.
-        - First applies multi-head self-attention with pre-layer normalization.
-        - Then applies either the KAN network or a feed-forward network.
-        - Residual connections are used after each sub-layer.
-        """
-        # Multi-head self-attention sub-layer.
+        # Apply pre-layer normalization before self-attention.
         norm_a = self.attention_layer_norm(hidden_states)
         attn_output = self.self_attention(norm_a, attention_mask)
         hidden_states = self.add(hidden_states, attn_output, self.attention_dense, self.attention_dropout)
         
-        # Feed-forward or KAN sub-layer.
+        # Apply pre-layer normalization before feed-forward or ChebyKAN network.
         norm_ff = self.out_layer_norm(hidden_states)
         if hasattr(self, "kan_layer"):
-            # For KAN, flatten the sequence dimensions so that the input is 2D.
             batch_size, seq_len, hidden_dim = norm_ff.shape
             flat_norm = norm_ff.view(-1, hidden_dim)
             ff_output = self.kan_layer(flat_norm)
-            # Restore the original 3D shape.
+            # If the output dimension is different, project it back to hidden_dim.
+            if self.kan_projection is not None:
+                ff_output = self.kan_projection(ff_output)
             ff_output = ff_output.view(batch_size, seq_len, hidden_dim)
         else:
             ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
-            
+        
         hidden_states = self.add(hidden_states, ff_output, lambda x: x, self.out_dropout)
         return hidden_states
