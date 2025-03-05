@@ -1,3 +1,4 @@
+import math
 from torch import nn
 import torch.nn.functional as F
 from modules.attention import CausalSelfAttention
@@ -16,10 +17,9 @@ class GPT2Layer(nn.Module):
         # KAN network (if enabled).
         if getattr(config, "use_kan", False):
             print("Using new KAN implementation")
-            # Construct a KAN network that maps from hidden_size to hidden_size.
+            # KAN network.
             # The layers_hidden list defines the architecture: input, hidden, and output dimensions.
-            self.kan_layer = KAN(layers_hidden=[config.hidden_size, getattr(config, "kan_degree", 8), config.hidden_size])
-            self.out_dense = nn.Linear(config.hidden_size, config.hidden_size)
+            self.kan_layer = KAN(layers_hidden=[config.hidden_size, int(math.sqrt(config.intermediate_size)), config.hidden_size])
         else:
             print("Using feed forward network")
             # Feed forward block.
@@ -62,7 +62,6 @@ class GPT2Layer(nn.Module):
             ff_output = self.kan_layer(flat_norm)
             # Restore the original 3D shape.
             ff_output = ff_output.view(batch_size, seq_len, hidden_dim)
-            ff_output = self.out_dense(ff_output)
         else:
             ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
             
