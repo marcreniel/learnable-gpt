@@ -18,6 +18,8 @@ from models.gpt2 import GPT2Model
 from optimizer import AdamW
 from tqdm import tqdm
 
+from peft import LoraConfig
+
 TQDM_DISABLE = False
 
 
@@ -46,7 +48,7 @@ class GPT2SentimentClassifier(torch.nn.Module):
     self.gpt = GPT2Model.from_pretrained(
         use_kan=config.use_kan,
     )
-    
+
     # Pretrain mode does not require updating GPT paramters.
     assert config.fine_tune_mode in ["last-linear-layer", "full-model"]
     for param in self.gpt.parameters():
@@ -66,18 +68,18 @@ class GPT2SentimentClassifier(torch.nn.Module):
     ### TODO: The final GPT contextualized embedding is the hidden state of [CLS] token (the first token).
     ###       HINT: You should consider what is an appropriate return value given that
     ###       the training loop currently uses F.cross_entropy as the loss function.
-    ### YOUR CODE HERE    
-    outputs = self.gpt(input_ids=input_ids, attention_mask=attention_mask) 
+    ### YOUR CODE HERE
+    outputs = self.gpt(input_ids=input_ids, attention_mask=attention_mask)
     last_hidden_states = outputs['last_hidden_state']
-    
-    # Compute the index of the last non-padding token for each sequence. 
-    last_token_indices = attention_mask.sum(dim=1) - 1 # (batch_size,) 
 
-    # Gather the last token hidden state for each sequence. 
-    batch_size = last_hidden_states.shape[0] 
-    last_token_hidden = last_hidden_states[torch.arange(batch_size), last_token_indices] 
-    
-    # Pass through dropout and classification head. 
+    # Compute the index of the last non-padding token for each sequence.
+    last_token_indices = attention_mask.sum(dim=1) - 1 # (batch_size,)
+
+    # Gather the last token hidden state for each sequence.
+    batch_size = last_hidden_states.shape[0]
+    last_token_hidden = last_hidden_states[torch.arange(batch_size), last_token_indices]
+
+    # Pass through dropout and classification head.
     logits = self.classifier(self.dropout(last_token_hidden))
 
     return logits
@@ -267,14 +269,16 @@ def train(args):
   dev_dataloader = DataLoader(dev_dataset, shuffle=False, batch_size=args.batch_size,
                               collate_fn=dev_dataset.collate_fn)
 
-  # Init model.
-  config = {'hidden_dropout_prob': args.hidden_dropout_prob,
-            'num_labels': num_labels,
-            'hidden_size': 768,
-            'data_dir': '.',
-            'fine_tune_mode': args.fine_tune_mode,
-            'use_kan': args.use_kan
-            }
+  # Build configuration object, including LoRA config if needed.
+  config = {
+    'hidden_dropout_prob': args.hidden_dropout_prob,
+    'num_labels': num_labels,
+    'hidden_size': 768,
+    'data_dir': '.',
+    'fine_tune_mode': args.fine_tune_mode,
+    'use_kan': False,
+    'use_lora': args.use_lora,
+      }
 
   config = SimpleNamespace(**config)
 
@@ -373,6 +377,7 @@ def get_args():
                       default=1e-3)
   # New flags to enable KAN layer
   parser.add_argument("--use_kan", action="store_true", help="Use KAN layer instead of MLP")
+  parser.add_argument("--use_lora", action="store_true", help="Use LoRA layer instead of MLP")
 
   args = parser.parse_args()
   return args
@@ -394,7 +399,8 @@ if __name__ == "__main__":
     dev='data/ids-sst-dev.csv',
     test='data/ids-sst-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
-    use_kan=args.use_kan,       
+    use_kan=args.use_kan,
+    use_lora=args.use_lora,
     dev_out='predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-sst-test-out.csv'
   )
@@ -417,6 +423,7 @@ if __name__ == "__main__":
     test='data/ids-cfimdb-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
     use_kan=args.use_kan,
+    use_lora=args.use_lora,
     dev_out='predictions/' + args.fine_tune_mode + '-cfimdb-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-cfimdb-test-out.csv'
   )
