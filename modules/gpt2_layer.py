@@ -1,7 +1,8 @@
 from torch import nn
 import torch.nn.functional as F
 from modules.attention import CausalSelfAttention
-from modules.efficientkan_layer import KAN 
+from modules.kan_layer import KAN 
+from peft import LoraConfig
 
 class GPT2Layer(nn.Module):
     def __init__(self, config):
@@ -14,7 +15,25 @@ class GPT2Layer(nn.Module):
         self.attention_dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # KAN network (if enabled).
-        if getattr(config, "use_kan", False):
+        if getattr(config, "use_kan", False) and getattr(config, "use_lora", False):
+            from modules.kanlora_layer import LoRAKAN
+            # LoRAKAN-MLP network.
+            lora_config = LoraConfig(
+                r=8,
+                lora_alpha=32,
+                target_modules=["lora_base_A", "lora_spline_A"],
+                lora_dropout=0.05,
+            )
+            self.interm_kan = LoRAKAN(
+                layers_hidden=[config.hidden_size, config.intermediate_size],
+                lora_config=lora_config
+            )
+            self.interm_af = F.gelu
+            self.out_kan = LoRAKAN(
+                layers_hidden=[config.intermediate_size, config.hidden_size],
+                lora_config=lora_config
+            )
+        elif getattr(config, "use_kan", False):
             # KAN-MLP network.
             self.interm_kan = KAN(layers_hidden=[config.hidden_size, config.intermediate_size])
             self.interm_af = F.gelu

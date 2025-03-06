@@ -110,7 +110,7 @@ class GPT2Model(GPTPreTrainedModel):
     return torch.matmul(hidden_state, self.word_embedding.weight.T)
 
   @classmethod
-  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False):
+  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False):
       gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
       # Config with KAN support.
       config = GPT2Config(
@@ -119,6 +119,7 @@ class GPT2Model(GPTPreTrainedModel):
           num_attention_heads=num_heads,
           intermediate_size=d*3,
           use_kan=use_kan,
+          use_lora=use_lora
       )
       our_model = GPT2Model(config).eval()
   
@@ -151,8 +152,10 @@ class GPT2Model(GPTPreTrainedModel):
             layer.interm_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.bias']
             layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
             layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
+          elif use_kan and use_lora:
+            print("Using LoRA-KAN-NLP network")
           else:
-            print("Using hybrid MLP-KAN implementation")
+            print("Using KAN-MLP network")
           # Remap second layer norm weights.
           layer.out_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_2.weight']
           layer.out_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_2.bias']
