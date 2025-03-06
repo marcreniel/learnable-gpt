@@ -159,7 +159,7 @@ class GPT2Model(GPTPreTrainedModel):
             layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
             layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
           elif use_kan and use_lora:
-            print("Using DoRA-KAN-NLP network")
+            print("Using LoRA-KAN-NLP network")
           else:
             print("Using KAN-MLP network")
           # Remap second layer norm weights.
