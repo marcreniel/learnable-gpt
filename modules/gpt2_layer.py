@@ -18,21 +18,10 @@ class GPT2Layer(nn.Module):
         if getattr(config, "use_kan", False) and getattr(config, "use_lora", False):
             from modules.kanlora_layer import LoRAKAN
             # LoRAKAN-MLP network.
-            lora_config = LoraConfig(
-                r=8,
-                lora_alpha=32,
-                target_modules=["lora_base_A", "lora_spline_A"],
-                lora_dropout=0.05,
-            )
-            self.interm_kan = LoRAKAN(
-                layers_hidden=[config.hidden_size, config.intermediate_size],
-                lora_config=lora_config
-            )
+            lora_config = LoraConfig(r=8, lora_alpha=32, target_modules=["lora_base_A", "lora_spline_A"], lora_dropout=0.05)
+            self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=lora_config)
             self.interm_af = F.gelu
-            self.out_kan = LoRAKAN(
-                layers_hidden=[config.intermediate_size, config.hidden_size],
-                lora_config=lora_config
-            )
+            self.out_kan = LoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=lora_config)
         elif getattr(config, "use_kan", False):
             # KAN-MLP network.
             self.interm_kan = KAN(layers_hidden=[config.hidden_size, config.intermediate_size])
