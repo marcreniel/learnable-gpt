@@ -17,9 +17,9 @@ class GPT2Layer(nn.Module):
         # KAN network (if enabled).
         if getattr(config, "use_kan", False):
             # KAN-MLP network.
-            self.interm_kan = KAN(layers_hidden=[config.hidden_size, int(math.sqrt(config.intermediate_size)), config.intermediate_size])
+            self.interm_kan = KAN(layers_hidden=[config.hidden_size, int(math.sqrt(config.intermediate_size)), int(math.sqrt(config.intermediate_size))])
             self.interm_af = F.gelu
-            self.out_kan = KAN(layers_hidden=[config.intermediate_size, int(math.sqrt(config.hidden_size)), config.hidden_size])
+            self.out_kan = KAN(layers_hidden=[int(math.sqrt(config.intermediate_size)), int(math.sqrt(config.hidden_size)), config.hidden_size])
         else:
             # Feed forward block.
             self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
