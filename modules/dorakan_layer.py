@@ -6,24 +6,16 @@ from peft import LoraConfig
 from modules.kan_layer import KAN, KANLinear
 
 class DoRAKANLinear(KANLinear):
-    """DoRA-enhanced KAN layer with magnitude-direction decomposition"""
+    """DoRA-enhanced KAN layer with base weight decomposition only"""
     def __init__(self, lora_config: LoraConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lora_config = lora_config
         
         # Base path decomposition
-        self.dora_base_magnitude = nn.Parameter(torch.ones(self.out_features))
-        self.dora_base_A = nn.Parameter(torch.empty(
+        self.dora_magnitude = nn.Parameter(torch.ones(self.out_features))
+        self.dora_A = nn.Parameter(torch.empty(
             lora_config.r, self.in_features))
-        self.dora_base_B = nn.Parameter(torch.empty(
-            self.out_features, lora_config.r))
-        
-        # Spline path decomposition
-        spline_dim = self.in_features * (self.grid_size + self.spline_order)
-        self.dora_spline_magnitude = nn.Parameter(torch.ones(self.out_features))
-        self.dora_spline_A = nn.Parameter(torch.empty(
-            lora_config.r, spline_dim))
-        self.dora_spline_B = nn.Parameter(torch.empty(
+        self.dora_B = nn.Parameter(torch.empty(
             self.out_features, lora_config.r))
         
         # Initialize parameters
@@ -32,20 +24,12 @@ class DoRAKANLinear(KANLinear):
 
     def reset_dora_parameters(self):
         """Initialize DoRA components using KAN-aware initialization"""
-        # Base path
-        nn.init.kaiming_uniform_(self.dora_base_A, a=math.sqrt(5))
-        nn.init.zeros_(self.dora_base_B)
+        nn.init.kaiming_uniform_(self.dora_A, a=math.sqrt(5))
+        nn.init.zeros_(self.dora_B)
         
-        # Spline path
-        nn.init.kaiming_uniform_(self.dora_spline_A, a=math.sqrt(5))
-        nn.init.zeros_(self.dora_spline_B)
-        
-        # Magnitude parameters
+        # Initialize magnitude from base weight norms
         with torch.no_grad():
-            self.dora_base_magnitude.copy_(torch.norm(self.base_weight, dim=1))
-            spline_norms = torch.norm(self.spline_weight.view(
-                self.out_features, -1), dim=1)
-            self.dora_spline_magnitude.copy_(spline_norms)
+            self.dora_magnitude.copy_(torch.norm(self.base_weight, dim=1))
 
     def freeze_original(self):
         """Freeze original KAN parameters"""
@@ -55,40 +39,35 @@ class DoRAKANLinear(KANLinear):
             self.spline_scaler.requires_grad_(False)
 
     def forward(self, x: torch.Tensor):
-        # Original KAN computations with decomposed weights
+        # Original base computations with decomposed weights
         base_act = self.base_activation(x)
         
         # Base path with DoRA decomposition
         base_direction = F.linear(base_act, self.base_weight)
         if self.lora_config.r > 0:
-            base_lora = F.linear(F.linear(base_act, self.dora_base_A), self.dora_base_B)
+            base_lora = F.linear(F.linear(base_act, self.dora_A), self.dora_B)
             base_direction += self.lora_config.lora_alpha/self.lora_config.r * base_lora
-        base_out = self.dora_base_magnitude * F.normalize(base_direction, dim=-1)
+        base_out = self.dora_magnitude * F.normalize(base_direction, dim=-1)
         
-        # Spline path with DoRA decomposition and L1 regularization
+        # Original spline path (unchanged from KANLinear)
         spline_basis = self.b_splines(x).flatten(1)
-        spline_direction = F.linear(spline_basis, 
-                                  self.scaled_spline_weight.view(self.out_features, -1))
-        if self.lora_config.r > 0:
-            spline_lora = F.linear(F.linear(spline_basis, self.dora_spline_A), 
-                                 self.dora_spline_B)
-            spline_direction += self.lora_config.lora_alpha/self.lora_config.r * spline_lora
-        spline_out = self.dora_spline_magnitude * F.normalize(spline_direction, dim=-1)
+        spline_out = F.linear(spline_basis, 
+                            self.scaled_spline_weight.view(self.out_features, -1))
         
         return (base_out + spline_out).view(*x.shape[:-1], -1)
 
     def l1_regularization_loss(self):
-        """Combined L1 regularization for spline components"""
-        # Spline path regularization (absolute values of magnitude + direction components)
-        spline_reg = torch.sum(torch.abs(self.dora_spline_magnitude)) + \
-                   torch.sum(torch.abs(self.dora_spline_A)) + \
-                   torch.sum(torch.abs(self.dora_spline_B))
+        """Combined L1 regularization for base components only"""
+        # Base path regularization
+        base_reg = torch.sum(torch.abs(self.dora_magnitude)) + \
+                 torch.sum(torch.abs(self.dora_A)) + \
+                 torch.sum(torch.abs(self.dora_B))
         
         # Add original KAN regularization
-        return super().regularization_loss() + 0.1 * spline_reg
+        return super().regularization_loss() + 0.1 * base_reg
 
 class DoRAKAN(KAN):
-    """DoRA-adapted KAN implementation"""
+    """DoRA-adapted KAN implementation (base weights only)"""
     def __init__(self, lora_config: LoraConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lora_config = lora_config
