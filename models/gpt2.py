@@ -152,8 +152,7 @@ class GPT2Model(GPTPreTrainedModel):
             layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
             layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
           else:
-            print("Using hybrid NLP-KAN implementation")
-
+            print("Using hybrid MLP-KAN implementation")
           # Remap second layer norm weights.
           layer.out_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_2.weight']
           layer.out_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_2.bias']
