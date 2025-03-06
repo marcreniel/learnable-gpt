@@ -144,13 +144,16 @@ class GPT2Model(GPTPreTrainedModel):
           layer.attention_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_1.weight']
           layer.attention_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_1.bias']
   
-          if not getattr(layer, "kan_layer", None):
-              # Only remap the MLP branch if KAN is not used.
-              layer.interm_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.weight'].T
-              layer.interm_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.bias']
-              layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
-              layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
-  
+          if not hasattr(layer, "interm_kan"):
+            print("Using feed forward network")
+            # Only remap the MLP branch if KAN is not used.
+            layer.interm_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.weight'].T
+            layer.interm_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.bias']
+            layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
+            layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
+          else:
+            print("Using hybrid NLP-KAN implementation")
+
           # Remap second layer norm weights.
           layer.out_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_2.weight']
           layer.out_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_2.bias']

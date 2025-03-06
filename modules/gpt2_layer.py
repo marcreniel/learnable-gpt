@@ -16,16 +16,14 @@ class GPT2Layer(nn.Module):
 
         # KAN network (if enabled).
         if getattr(config, "use_kan", False):
-            print("Using new KAN implementation")
-            # KAN network.
-            # The layers_hidden list defines the architecture: input, hidden, and output dimensions.
-            self.kan_layer = KAN(layers_hidden=[config.hidden_size, int(math.sqrt(config.intermediate_size)), config.hidden_size])
+            # KAN-MLP network.
+            self.interm_kan = KAN(layers_hidden=[config.hidden_size, int(math.sqrt(config.intermediate_size)), config.intermediate_size])
+            self.interm_af = F.gelu
+            self.out_kan = KAN(layers_hidden=[config.intermediate_size, int(math.sqrt(config.hidden_size)), config.hidden_size])
         else:
-            print("Using feed forward network")
             # Feed forward block.
             self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
             self.interm_af = F.gelu
-            # Add-norm for feed forward.
             self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
             
         self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
@@ -55,13 +53,13 @@ class GPT2Layer(nn.Module):
         
         # Feed-forward or KAN sub-layer.
         norm_ff = self.out_layer_norm(hidden_states)
-        if hasattr(self, "kan_layer"):
+        if hasattr(self, "interm_kan"):
             # For KAN, flatten the sequence dimensions so that the input is 2D.
             batch_size, seq_len, hidden_dim = norm_ff.shape
             flat_norm = norm_ff.view(-1, hidden_dim)
-            ff_output = self.kan_layer(flat_norm)
-            # Restore the original 3D shape.
+            ff_output = self.out_kan(self.interm_af(self.interm_kan(flat_norm)))
             ff_output = ff_output.view(batch_size, seq_len, hidden_dim)
+            
         else:
             ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
             
