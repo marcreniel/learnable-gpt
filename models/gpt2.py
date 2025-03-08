@@ -110,16 +110,23 @@ class GPT2Model(GPTPreTrainedModel):
     return torch.matmul(hidden_state, self.word_embedding.weight.T)
 
   @classmethod
-  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False):
+  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False):
       gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
       # Config with KAN support.
       config = GPT2Config(
           hidden_size=d,
           num_hidden_layers=l,
           num_attention_heads=num_heads,
-          intermediate_size=d*3,
+          intermediate_size=d*4,
           use_kan=use_kan,
+          use_lora=use_lora
       )
+      if use_lora:
+          from peft import LoraConfig
+          # You can adjust these values (r, dropout, alpha) as needed.
+          config.lora_config = LoraConfig(r=8)
+          config.lora_config.alpha = 32
+          config.lora_config.dropout = 0.1
       our_model = GPT2Model(config).eval()
   
       # Load word and positional embeddings.
