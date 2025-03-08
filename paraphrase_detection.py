@@ -50,8 +50,15 @@ class ParaphraseGPT(nn.Module):
 
   def __init__(self, args):
     super().__init__()
-    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads)
-    self.paraphrase_detection_head = nn.Linear(args.d, 2)  # Paraphrase detection has two outputs: 1 (yes) or 0 (no).
+    # CHANGED: Added use_lora flag to enable LoRA when provided.
+    self.gpt = GPT2Model.from_pretrained(
+      model=args.model_size,
+      d=args.d,
+      l=args.l,
+      num_heads=args.num_heads,
+      use_lora=args.use_lora
+    )
+    self.paraphrase_detection_head = nn.Linear(args.d, 2)
 
     # By default, fine-tune the full model.
     for param in self.gpt.parameters():
@@ -210,6 +217,9 @@ def get_args():
   parser.add_argument("--model_size", type=str,
                       help="The model size as specified on hugging face. DO NOT use the xl model.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large'], default='gpt2')
+
+  # New Flags
+  parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
 
   args = parser.parse_args()
   return args
