@@ -56,7 +56,8 @@ class ParaphraseGPT(nn.Module):
       d=args.d,
       l=args.l,
       num_heads=args.num_heads,
-      use_lora=args.use_lora
+      use_lora=args.use_lora,
+      use_graph=args.use_graph
     )
     self.paraphrase_detection_head = nn.Linear(args.d, 2)
 
@@ -222,6 +223,8 @@ def get_args():
 
   # New Flags
   parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
+  parser.add_argument('--use_graph', action='store_true',
+                     help='Use graph attention enhancement')
 
   args = parser.parse_args()
   return args

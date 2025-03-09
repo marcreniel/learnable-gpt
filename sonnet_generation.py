@@ -46,7 +46,14 @@ class SonnetGPT(nn.Module):
 
   def __init__(self, args):
     super().__init__()
-    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads)
+    self.gpt = GPT2Model.from_pretrained(
+      model=args.model_size, 
+      d=args.d, 
+      l=args.l, 
+      num_heads=args.num_heads,
+      use_lora=args.use_lora,
+      use_graph=args.use_graph
+    )
     self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -235,6 +242,9 @@ def get_args():
   parser.add_argument("--temperature", type=float, help="softmax temperature.", default=1.2)
   parser.add_argument("--top_p", type=float, help="Cumulative probability distribution for nucleus sampling.",
                       default=0.9)
+  parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
+  parser.add_argument('--use_graph', action='store_true',
+                     help='Use graph attention enhancement')
 
   parser.add_argument("--batch_size", help='The training batch size.', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
