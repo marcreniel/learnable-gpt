@@ -16,32 +16,12 @@ class GPT2Layer(nn.Module):
 
         # KAN network (if enabled).
         if getattr(config, "use_kan", False) and getattr(config, "use_lora", False):
-<<<<<<< HEAD
             from modules.dorakan_layer import DoRAKAN
             # LoRAKAN-MLP network.
             dora_config = LoraConfig(r=32, lora_alpha=64)
             self.interm_kan = DoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=dora_config)
             self.interm_af = F.gelu
             self.out_kan = DoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=dora_config)
-=======
-            from modules.kanlora_layer import LoRAKAN
-            # LoRAKAN-MLP network.
-            lora_config = LoraConfig(
-                r=8,
-                lora_alpha=32,
-                target_modules=["lora_base_A", "lora_spline_A"],
-                lora_dropout=0.05,
-            )
-            self.interm_kan = LoRAKAN(
-                layers_hidden=[config.hidden_size, config.intermediate_size],
-                lora_config=lora_config
-            )
-            self.interm_af = F.gelu
-            self.out_kan = LoRAKAN(
-                layers_hidden=[config.intermediate_size, config.hidden_size],
-                lora_config=lora_config
-            )
->>>>>>> b1753f6 (Added extremely expir lorakan, fixes in classifier)
         elif getattr(config, "use_kan", False):
             # KAN-MLP network.
             self.interm_kan = KAN(layers_hidden=[config.hidden_size, config.intermediate_size])
