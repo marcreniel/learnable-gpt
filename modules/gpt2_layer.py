@@ -16,19 +16,22 @@ class GPT2Layer(nn.Module):
 
         # KAN network (if enabled).
         if getattr(config, "use_kan", False) and getattr(config, "use_lora", False):
-            from modules.dorakan_layer import DoRAKAN
+            from modules.kanlora_layer import LoRAKAN
             # LoRAKAN-MLP network.
-            dora_config = LoraConfig(r=32, lora_alpha=64)
-            self.interm_kan = DoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=dora_config)
+            print("Using LoRA-KAN-NLP network")
+            lora_config = LoraConfig(r=32, lora_alpha=64, target_modules=["base_weight"], lora_dropout=0.1, inference_mode=False, bias="none")
+            self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=lora_config)
             self.interm_af = F.gelu
-            self.out_kan = DoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=dora_config)
+            self.out_kan = LoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=lora_config)
         elif getattr(config, "use_kan", False):
             # KAN-MLP network.
+            print("Using KAN-MLP network")
             self.interm_kan = KAN(layers_hidden=[config.hidden_size, config.intermediate_size])
             self.interm_af = F.gelu
             self.out_kan = KAN(layers_hidden=[config.intermediate_size, config.hidden_size])
         # LoRA network (if enabled).
         elif getattr(config, "use_lora", False):
+            print("Using LoRA network")
             from modules.lora_layer import LoRALinear
             self.interm_dense = LoRALinear(config.hidden_size, config.intermediate_size, lora_config=config.lora_config)
             self.interm_af = F.gelu
@@ -72,7 +75,6 @@ class GPT2Layer(nn.Module):
             flat_norm = norm_ff.view(-1, hidden_dim)
             ff_output = self.out_kan(self.interm_af(self.interm_kan(flat_norm)))
             ff_output = ff_output.view(batch_size, seq_len, hidden_dim)
-            
         else:
             ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
             

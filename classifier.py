@@ -18,10 +18,7 @@ from models.gpt2 import GPT2Model
 from optimizer import AdamW
 from tqdm import tqdm
 
-from peft import LoraConfig
-
 TQDM_DISABLE = False
-
 
 # Fix the random seed.
 def seed_everything(seed=11711):
@@ -404,7 +401,6 @@ if __name__ == "__main__":
     fine_tune_mode=args.fine_tune_mode,
     use_kan=args.use_kan,
     use_lora=args.use_lora,
-    use_kan=args.use_kan,      
     weight_decay=args.weight_decay,
     dev_out='predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-sst-test-out.csv'

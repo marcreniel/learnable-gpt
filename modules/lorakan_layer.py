@@ -6,34 +6,25 @@ from peft import LoraConfig
 from modules.kan_layer import KAN, KANLinear
 
 class LoRAKANLinear(KANLinear):
-    """LoRA-enhanced KAN linear layer with separate adapters for base and spline paths"""
+    """LoRA-enhanced KAN layer with low-rank adaptation"""
     def __init__(self, lora_config: LoraConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lora_config = lora_config
         
-        # Base weight LoRA parameters
-        self.lora_base_A = nn.Parameter(torch.empty(
+        # LoRA components
+        self.lora_A = nn.Parameter(torch.empty(
             lora_config.r, self.in_features))
-        self.lora_base_B = nn.Parameter(torch.empty(
+        self.lora_B = nn.Parameter(torch.empty(
             self.out_features, lora_config.r))
         
-        # Spline weight LoRA parameters
-        spline_dim = self.in_features * (self.grid_size + self.spline_order)
-        self.lora_spline_A = nn.Parameter(torch.empty(
-            lora_config.r, spline_dim))
-        self.lora_spline_B = nn.Parameter(torch.empty(
-            self.out_features, lora_config.r))
-        
-        # Initialize LoRA parameters
+        # Initialize parameters
         self.reset_lora_parameters()
         self.freeze_original()
 
     def reset_lora_parameters(self):
-        """Initialize LoRA while preserving original weights"""
-        nn.init.kaiming_uniform_(self.lora_base_A, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_base_B)
-        nn.init.kaiming_uniform_(self.lora_spline_A, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_spline_B)
+        """Initialize LoRA components"""
+        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+        nn.init.zeros_(self.lora_B)
 
     def freeze_original(self):
         """Freeze original KAN parameters"""
@@ -43,29 +34,32 @@ class LoRAKANLinear(KANLinear):
             self.spline_scaler.requires_grad_(False)
 
     def forward(self, x: torch.Tensor):
-        # Original KAN computations
+        # Original base computations
         base_act = self.base_activation(x)
+        
+        # Base path with LoRA
         base_out = F.linear(base_act, self.base_weight)
+        if self.lora_config.r > 0:
+            lora_adjustment = F.linear(F.linear(base_act, self.lora_A), self.lora_B)
+            base_out += self.lora_config.lora_alpha/self.lora_config.r * lora_adjustment
+        
+        # Original spline path
         spline_basis = self.b_splines(x).flatten(1)
         spline_out = F.linear(spline_basis, 
                             self.scaled_spline_weight.view(self.out_features, -1))
         
-        # LoRA additions
-        if self.lora_config.r > 0:
-            # Base path LoRA
-            lora_base = F.linear(base_act, self.lora_base_A)
-            lora_base = F.linear(lora_base, self.lora_base_B)
-            base_out += self.lora_config.lora_alpha/self.lora_config.r * lora_base
-            
-            # Spline path LoRA
-            lora_spline = F.linear(spline_basis, self.lora_spline_A)
-            lora_spline = F.linear(lora_spline, self.lora_spline_B)
-            spline_out += self.lora_config.lora_alpha/self.lora_config.r * lora_spline
-        
         return (base_out + spline_out).view(*x.shape[:-1], -1)
 
+    def l1_regularization_loss(self):
+        """Combined L1 regularization for LoRA components"""
+        lora_reg = torch.sum(torch.abs(self.lora_A)) + \
+                 torch.sum(torch.abs(self.lora_B))
+        
+        # Add original KAN regularization
+        return super().regularization_loss() + 0.1 * lora_reg
+
 class LoRAKAN(KAN):
-    """Wrapper for converting KAN layers to LoRA-KAN"""
+    """LoRA-adapted KAN implementation"""
     def __init__(self, lora_config: LoraConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lora_config = lora_config
@@ -87,6 +81,12 @@ class LoRAKAN(KAN):
                 base_activation=layer.base_activation.__class__,
                 grid_eps=layer.grid_eps,
             )
-            # Transfer original weights
             new_layer.load_state_dict(layer.state_dict(), strict=False)
             self.layers[i] = new_layer
+
+    def regularization_loss(self):
+        """Aggregate regularization across all layers"""
+        total_loss = 0.0
+        for layer in self.layers:
+            total_loss += layer.l1_regularization_loss()
+        return total_loss

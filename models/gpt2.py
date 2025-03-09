@@ -152,16 +152,11 @@ class GPT2Model(GPTPreTrainedModel):
           layer.attention_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_1.bias']
   
           if not hasattr(layer, "interm_kan"):
-            print("Using feed forward network")
             # Only remap the MLP branch if KAN is not used.
             layer.interm_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.weight'].T
             layer.interm_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.bias']
             layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
             layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
-          elif use_kan and use_lora:
-            print("Using LoRA-KAN-NLP network")
-          else:
-            print("Using KAN-MLP network")
           # Remap second layer norm weights.
           layer.out_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_2.weight']
           layer.out_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_2.bias']
