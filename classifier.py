@@ -287,7 +287,8 @@ def train(args):
   model = model.to(device)
 
   lr = args.lr
-  optimizer = AdamW(model.parameters(), lr=lr)
+  weight_decay = args.weight_decay
+  optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
   best_dev_acc = 0
 
   # Run for the specified number of epochs.
@@ -379,6 +380,7 @@ def get_args():
   # New flags to enable KAN layer
   parser.add_argument("--use_kan", action="store_true", help="Use KAN layer instead of MLP")
   parser.add_argument("--use_lora", action="store_true", help="Use LoRA layer instead of MLP")
+  parser.add_argument("--weight_decay", type=float, default=0.0)
 
   args = parser.parse_args()
   return args
@@ -402,6 +404,8 @@ if __name__ == "__main__":
     fine_tune_mode=args.fine_tune_mode,
     use_kan=args.use_kan,
     use_lora=args.use_lora,
+    use_kan=args.use_kan,      
+    weight_decay=args.weight_decay,
     dev_out='predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-sst-test-out.csv'
   )
@@ -425,6 +429,7 @@ if __name__ == "__main__":
     fine_tune_mode=args.fine_tune_mode,
     use_kan=args.use_kan,
     use_lora=args.use_lora,
+    weight_decay=args.weight_decay,
     dev_out='predictions/' + args.fine_tune_mode + '-cfimdb-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-cfimdb-test-out.csv'
   )
