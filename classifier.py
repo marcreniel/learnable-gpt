@@ -47,6 +47,7 @@ class GPT2SentimentClassifier(torch.nn.Module):
     self.num_labels = config.num_labels
     self.gpt = GPT2Model.from_pretrained(
         use_kan=config.use_kan,
+        use_lora=config.use_lora,
     )
 
     # Pretrain mode does not require updating GPT paramters.
@@ -276,7 +277,7 @@ def train(args):
     'hidden_size': 768,
     'data_dir': '.',
     'fine_tune_mode': args.fine_tune_mode,
-    'use_kan': False,
+    'use_kan': args.use_kan,
     'use_lora': args.use_lora,
       }
 
