@@ -149,7 +149,8 @@ def train(args):
   model = model.to(device)
 
   lr = args.lr
-  optimizer = AdamW(model.parameters(), lr=lr)
+  weight_decay = args.weight_decay
+  optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
@@ -237,6 +238,7 @@ def get_args():
 
   parser.add_argument("--batch_size", help='The training batch size.', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
+  parser.add_argument("--weight_decay", type=float, help="weight decay", default=0.0)
   parser.add_argument("--model_size", type=str, help="The model size as specified on hugging face.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'], default='gpt2')
 
