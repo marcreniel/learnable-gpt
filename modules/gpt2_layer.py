@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from modules.attention import CausalSelfAttention
 from modules.kan_layer import KAN 
 from peft import LoraConfig
+from modules.graph_attention import GraphAttentionLayer
 
 class GPT2Layer(nn.Module):
     def __init__(self, config):
@@ -45,6 +46,12 @@ class GPT2Layer(nn.Module):
         self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.out_dropout = nn.Dropout(config.hidden_dropout_prob)
 
+        # Add graph attention if enabled
+        self.use_graph = getattr(config, "use_graph", False)
+        if self.use_graph:
+            self.graph_attention = GraphAttentionLayer(config)
+            self.graph_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+
     def add(self, input, output, dense_layer, dropout):
         """
         Helper method:
@@ -60,6 +67,7 @@ class GPT2Layer(nn.Module):
         Forward pass of the GPT-2 layer.
         - First applies multi-head self-attention with pre-layer normalization.
         - Then applies either the KAN network or a feed-forward network.
+        - If graph attention is enabled, applies it after the feed-forward network.
         - Residual connections are used after each sub-layer.
         """
         # Multi-head self-attention sub-layer.
@@ -79,4 +87,11 @@ class GPT2Layer(nn.Module):
             ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
             
         hidden_states = self.add(hidden_states, ff_output, lambda x: x, self.out_dropout)
+
+        # Apply graph attention if enabled
+        if self.use_graph:
+            norm_g = self.graph_layer_norm(hidden_states)
+            graph_output = self.graph_attention(norm_g, hidden_states)
+            hidden_states = self.add(hidden_states, graph_output, lambda x: x, self.out_dropout)
+
         return hidden_states

@@ -110,7 +110,7 @@ class GPT2Model(GPTPreTrainedModel):
     return torch.matmul(hidden_state, self.word_embedding.weight.T)
 
   @classmethod
-  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False):
+  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False, use_graph=False):
       gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
       # Config with KAN support.
       config = GPT2Config(
@@ -119,7 +119,8 @@ class GPT2Model(GPTPreTrainedModel):
           num_attention_heads=num_heads,
           intermediate_size=d*4,
           use_kan=use_kan,
-          use_lora=use_lora
+          use_lora=use_lora,
+          use_graph=use_graph
       )
       if use_lora:
           from peft import LoraConfig

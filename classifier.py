@@ -378,6 +378,8 @@ def get_args():
   parser.add_argument("--use_kan", action="store_true", help="Use KAN layer instead of MLP")
   parser.add_argument("--use_lora", action="store_true", help="Use LoRA layer instead of MLP")
   parser.add_argument("--weight_decay", type=float, default=0.0)
+  parser.add_argument('--use_graph', action='store_true',
+                     help='Use graph attention enhancement')
 
   args = parser.parse_args()
   return args
