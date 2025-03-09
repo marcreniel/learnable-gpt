@@ -110,45 +110,64 @@ class GPT2Model(GPTPreTrainedModel):
     return torch.matmul(hidden_state, self.word_embedding.weight.T)
 
   @classmethod
-  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12):
-    gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
-    our_model = GPT2Model(GPT2Config(hidden_size=d, num_hidden_layers=l,num_attention_heads=num_heads,
-                                     intermediate_size=d*3)).eval()
-
-    # Load word and positional embeddings.
-    our_model.word_embedding.load_state_dict(gpt_model.wte.state_dict())
-    our_model.pos_embedding.load_state_dict(gpt_model.wpe.state_dict())
-
-    for i in range(l):
-      l = our_model.gpt_layers[i]
-      # Remap the Q,K,V weights from a conv1d to 3 linear projections
-      l.self_attention.query.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.weight'][:, :d].T
-      l.self_attention.query.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.bias'][:d]
-      l.self_attention.key.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.weight'][:, d:d*2].T
-      l.self_attention.key.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.bias'][d:d*2]
-      l.self_attention.value.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.weight'][:, d*2:].T
-      l.self_attention.value.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.bias'][d*2:]
-
-      # Remap final dense layer in MHA.
-      l.attention_dense.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_proj.weight'].T
-      l.attention_dense.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_proj.bias']
-
-      # Remap attention layer norm.
-      l.attention_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_1.weight']
-      l.attention_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_1.bias']
-
-      # Remap post-attention MLP layers.
-      l.interm_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.weight'].T
-      l.interm_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.bias']
-      l.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
-      l.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
-
-      # Remap second layer norm weights.
-      l.out_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_2.weight']
-      l.out_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_2.bias']
-
-    # Remap the final layer norm values.
-    our_model.final_layer_norm.weight.data = gpt_model.state_dict()['ln_f.weight']
-    our_model.final_layer_norm.bias.data = gpt_model.state_dict()['ln_f.bias']
-
-    return our_model
+  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False):
+      gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
+      # Config with KAN support.
+      config = GPT2Config(
+          hidden_size=d,
+          num_hidden_layers=l,
+          num_attention_heads=num_heads,
+          intermediate_size=d*4,
+          use_kan=use_kan,
+          use_lora=use_lora
+      )
+      if use_lora:
+          from peft import LoraConfig
+          # You can adjust these values (r, dropout, alpha) as needed.
+          config.lora_config = LoraConfig(r=8)
+          config.lora_config.alpha = 32
+          config.lora_config.dropout = 0.1
+      our_model = GPT2Model(config).eval()
+  
+      # Load word and positional embeddings.
+      our_model.word_embedding.load_state_dict(gpt_model.wte.state_dict())
+      our_model.pos_embedding.load_state_dict(gpt_model.wpe.state_dict())
+  
+      for i in range(l):
+          layer = our_model.gpt_layers[i]
+          # Remap the Q,K,V weights from a conv1d to 3 linear projections.
+          layer.self_attention.query.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.weight'][:, :d].T
+          layer.self_attention.query.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.bias'][:d]
+          layer.self_attention.key.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.weight'][:, d:d*2].T
+          layer.self_attention.key.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.bias'][d:d*2]
+          layer.self_attention.value.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.weight'][:, d*2:].T
+          layer.self_attention.value.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_attn.bias'][d*2:]
+  
+          # Remap final dense layer in MHA.
+          layer.attention_dense.weight.data = gpt_model.state_dict()[f'h.{i}.attn.c_proj.weight'].T
+          layer.attention_dense.bias.data = gpt_model.state_dict()[f'h.{i}.attn.c_proj.bias']
+  
+          # Remap attention layer norm.
+          layer.attention_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_1.weight']
+          layer.attention_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_1.bias']
+  
+          if not hasattr(layer, "interm_kan"):
+            print("Using feed forward network")
+            # Only remap the MLP branch if KAN is not used.
+            layer.interm_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.weight'].T
+            layer.interm_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_fc.bias']
+            layer.out_dense.weight.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.weight'].T
+            layer.out_dense.bias.data = gpt_model.state_dict()[f'h.{i}.mlp.c_proj.bias']
+          elif use_kan and use_lora:
+            print("Using LoRA-KAN-NLP network")
+          else:
+            print("Using KAN-MLP network")
+          # Remap second layer norm weights.
+          layer.out_layer_norm.weight.data = gpt_model.state_dict()[f'h.{i}.ln_2.weight']
+          layer.out_layer_norm.bias.data = gpt_model.state_dict()[f'h.{i}.ln_2.bias']
+  
+      # Remap the final layer norm values.
+      our_model.final_layer_norm.weight.data = gpt_model.state_dict()['ln_f.weight']
+      our_model.final_layer_norm.bias.data = gpt_model.state_dict()['ln_f.bias']
+  
+      return our_model

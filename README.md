@@ -20,7 +20,7 @@ To test Part 1, you will run:
 
 * `optimizer_test.py`: To test your implementation of `optimizer.py`.
 * `sanity_check.py`: To test your implementation of GPT models.
-* `classifier.py` : To perform sentiment classification using your models.
+* `classifier.py` : To perform sentiment classification using your models (Note, to enable KAN, use feature flag --use_kan and to specify degrees use --kan_degree).
 
 In Part 2 of this project, you will use GPT2 (via cloze-style classification) detect if one sentence is a paraphrase of 
 another as well as generate sonnets via autoregressive language modeling.  
