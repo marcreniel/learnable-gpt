@@ -20,9 +20,10 @@ class GPT2Layer(nn.Module):
             from modules.lorakan_layer import LoRAKAN
             # LoRAKAN-MLP network.
             print("Using LoRA-KAN-NLP network")
-            self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, int(config.hidden_size*2)], lora_config=config.lora_config)
+            self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=config.lora_config)
             self.interm_af = F.gelu
-            self.out_kan = LoRAKAN(layers_hidden=[int(config.hidden_size*2), config.hidden_size], lora_config=config.lora_config)
+            self.interm_dropout = nn.Dropout(config.hidden_hybrid_dropout_prob)
+            self.out_kan = LoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=config.lora_config)
         elif getattr(config, "use_kan", False):
             # KAN-MLP network.
             print("Using KAN-MLP network")
@@ -49,6 +50,7 @@ class GPT2Layer(nn.Module):
         # Add graph attention if enabled
         self.use_graph = getattr(config, "use_graph", False)
         if self.use_graph:
+            print("Using Graph Attention")
             self.graph_attention = GraphAttentionLayer(config)
             self.graph_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
