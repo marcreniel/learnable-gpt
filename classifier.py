@@ -406,7 +406,7 @@ if __name__ == "__main__":
   args = get_args()
   seed_everything(args.seed)
 
-  wandb.init(project="sentiment_classifier", config=vars(args), reinit=True, name="SST-" + args.fine_tune_mode)
+  wandb.init(entity="lgpt_cs224n", project="cs224n_classifier", config=vars(args))
   print('Training Sentiment Classifier on SST...')
   config = SimpleNamespace(
     filepath='sst-classifier.pt',
@@ -434,7 +434,7 @@ if __name__ == "__main__":
   test(config)
   wandb.finish()
 
-  wandb.init(project="sentiment_classifier", config=vars(args), reinit=True, name="CFIMDB-" + args.fine_tune_mode)
+  wandb.init(entity="lgpt_cs224n", project="cs224n_classifier", config=vars(args))
   print('Training Sentiment Classifier on cfimdb...')
   config = SimpleNamespace(
     filepath='cfimdb-classifier.pt',

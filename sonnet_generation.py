@@ -301,12 +301,12 @@ if __name__ == "__main__":
     try:
       with open(args.wandb_config_file, "r") as f:
         wandb_config = json.load(f)
-      wandb.init(project=wandb_config.get("project", "default_project"), config=wandb_config)
+      wandb.init(project=wandb_config.get("project", "cs224n_sonnet"), config=wandb_config)
     except Exception as e:
       print(f"Error loading wandb config file: {e}")
-      wandb.init(project="default_project", config=vars(args))
+      wandb.init(entity="lgpt_cs224n", project="cs224n_sonnet", config=vars(args))
   else:
-    wandb.init(entity="lgpt_cs224n",project="cs224n_sonnet", config=vars(args))
+    wandb.init(entity="lgpt_cs224n", project="cs224n_sonnet", config=vars(args))
 
   seed_everything(args.seed)  # Fix the seed for reproducibility.
   train(args)
