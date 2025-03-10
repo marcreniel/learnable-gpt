@@ -18,6 +18,8 @@ from models.gpt2 import GPT2Model
 from optimizer import AdamW
 from tqdm import tqdm
 
+import wandb 
+
 TQDM_DISABLE = False
 
 # Fix the random seed.
@@ -74,7 +76,7 @@ class GPT2SentimentClassifier(torch.nn.Module):
     last_hidden_states = outputs['last_hidden_state']
 
     # Compute the index of the last non-padding token for each sequence.
-    last_token_indices = attention_mask.sum(dim=1) - 1 # (batch_size,)
+    last_token_indices = attention_mask.sum(dim=1) - 1  # (batch_size,)
 
     # Gather the last token hidden state for each sequence.
     batch_size = last_hidden_states.shape[0]
@@ -84,6 +86,7 @@ class GPT2SentimentClassifier(torch.nn.Module):
     logits = self.classifier(self.dropout(last_token_hidden))
 
     return logits
+
 
 class SentimentDataset(Dataset):
   def __init__(self, dataset, args):
@@ -189,14 +192,13 @@ def load_data(filename, flag='train'):
 
 # Evaluate the model on dev examples.
 def model_eval(dataloader, model, device):
-  model.eval()  # Switch to eval model, will turn off randomness like dropout.
+  model.eval()  # Switch to eval mode, will turn off randomness like dropout.
   y_true = []
   y_pred = []
   sents = []
   sent_ids = []
-  for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
-    b_ids, b_mask, b_labels, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], \
-                                                   batch['labels'], batch['sents'], batch['sent_ids']
+  for step, batch in enumerate(tqdm(dataloader, desc='eval', disable=TQDM_DISABLE)):
+    b_ids, b_mask, b_labels, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], batch['labels'], batch['sents'], batch['sent_ids']
 
     b_ids = b_ids.to(device)
     b_mask = b_mask.to(device)
@@ -219,13 +221,12 @@ def model_eval(dataloader, model, device):
 
 # Evaluate the model on test examples.
 def model_test_eval(dataloader, model, device):
-  model.eval()  # Switch to eval model, will turn off randomness like dropout.
+  model.eval()  # Switch to eval mode, will turn off randomness like dropout.
   y_pred = []
   sents = []
   sent_ids = []
-  for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
-    b_ids, b_mask, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], \
-                                         batch['sents'], batch['sent_ids']
+  for step, batch in enumerate(tqdm(dataloader, desc='eval', disable=TQDM_DISABLE)):
+    b_ids, b_mask, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], batch['sents'], batch['sent_ids']
 
     b_ids = b_ids.to(device)
     b_mask = b_mask.to(device)
@@ -282,12 +283,14 @@ def train(args):
     'use_lora': args.use_lora,
     'use_graph': args.use_graph,
     # END: Extention-implemented Flags
-      }
-
+  }
   config = SimpleNamespace(**config)
 
   model = GPT2SentimentClassifier(config)
   model = model.to(device)
+  
+  # Added WandB watch to log gradients and parameters.
+  wandb.watch(model, log="all", log_freq=100)
 
   lr = args.lr
   weight_decay = args.weight_decay
@@ -300,8 +303,7 @@ def train(args):
     train_loss = 0
     num_batches = 0
     for batch in tqdm(train_dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE):
-      b_ids, b_mask, b_labels = (batch['token_ids'],
-                                 batch['attention_mask'], batch['labels'])
+      b_ids, b_mask, b_labels = batch['token_ids'], batch['attention_mask'], batch['labels']
 
       b_ids = b_ids.to(device)
       b_mask = b_mask.to(device)
@@ -317,16 +319,25 @@ def train(args):
       train_loss += loss.item()
       num_batches += 1
 
-    train_loss = train_loss / (num_batches)
+    train_loss = train_loss / num_batches
 
     train_acc, train_f1, *_ = model_eval(train_dataloader, model, device)
     dev_acc, dev_f1, *_ = model_eval(dev_dataloader, model, device)
+
+    # WandB logging of epoch-level metrics.
+    wandb.log({
+      "epoch": epoch,
+      "train_loss": train_loss,
+      "train_acc": train_acc,
+      "dev_acc": dev_acc,
+      "dev_f1": dev_f1
+    })
 
     if dev_acc > best_dev_acc:
       best_dev_acc = dev_acc
       save_model(model, optimizer, args, config, args.filepath)
 
-    print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+    print(f"Epoch {epoch}: train loss :: {train_loss:.3f}, train acc :: {train_acc:.3f}, dev acc :: {dev_acc:.3f}")
 
 
 def test(args):
@@ -356,13 +367,13 @@ def test(args):
     print('DONE Test')
 
     with open(args.dev_out, "w+") as f:
-      print(f"dev acc :: {dev_acc :.3f}")
-      f.write(f"id \t Predicted_Sentiment \n")
+      print(f"dev acc :: {dev_acc:.3f}")
+      f.write("id \t Predicted_Sentiment \n")
       for p, s in zip(dev_sent_ids, dev_pred):
         f.write(f"{p}, {s} \n")
 
     with open(args.test_out, "w+") as f:
-      f.write(f"id \t Predicted_Sentiment \n")
+      f.write("id \t Predicted_Sentiment \n")
       for p, s in zip(test_sent_ids, test_pred):
         f.write(f"{p}, {s} \n")
 
@@ -395,6 +406,7 @@ if __name__ == "__main__":
   args = get_args()
   seed_everything(args.seed)
 
+  wandb.init(project="sentiment_classifier", config=vars(args), reinit=True, name="SST-" + args.fine_tune_mode)
   print('Training Sentiment Classifier on SST...')
   config = SimpleNamespace(
     filepath='sst-classifier.pt',
@@ -418,10 +430,11 @@ if __name__ == "__main__":
   )
 
   train(config)
-
   print('Evaluating on SST...')
   test(config)
+  wandb.finish()
 
+  wandb.init(project="sentiment_classifier", config=vars(args), reinit=True, name="CFIMDB-" + args.fine_tune_mode)
   print('Training Sentiment Classifier on cfimdb...')
   config = SimpleNamespace(
     filepath='cfimdb-classifier.pt',
@@ -445,6 +458,6 @@ if __name__ == "__main__":
   )
 
   train(config)
-
   print('Evaluating on cfimdb...')
   test(config)
+  wandb.finish()
