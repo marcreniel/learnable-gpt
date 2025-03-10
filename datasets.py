@@ -14,7 +14,6 @@ import torch
 from torch.utils.data import Dataset
 from transformers import GPT2Tokenizer
 
-
 def preprocess_string(s):
   return ' '.join(s.lower()
                   .replace('.', ' .')
@@ -61,7 +60,6 @@ class ParaphraseDetectionDataset(Dataset):
 
     return batched_data
 
-
 class ParaphraseDetectionTestDataset(Dataset):
   def __init__(self, dataset, args):
     self.dataset = dataset
@@ -95,7 +93,6 @@ class ParaphraseDetectionTestDataset(Dataset):
     }
 
     return batched_data
-
 
 def load_paraphrase_data(paraphrase_filename, split='train'):
   paraphrase_data = []

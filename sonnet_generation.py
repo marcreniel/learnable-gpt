@@ -33,7 +33,6 @@ import json
 
 TQDM_DISABLE = False
 
-
 # Fix the random seed.
 def seed_everything(seed=11711):
   random.seed(seed)
@@ -43,7 +42,6 @@ def seed_everything(seed=11711):
   torch.cuda.manual_seed_all(seed)
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
-
 
 class SonnetGPT(nn.Module):
   """Your GPT-2 Model designed for paraphrase detection."""
@@ -130,7 +128,6 @@ class SonnetGPT(nn.Module):
     generated_output = self.tokenizer.decode(token_ids[0].cpu().numpy().tolist())[3:]
     return token_ids, generated_output
 
-
 def save_model(model, optimizer, args, filepath):
   save_info = {
     'model': model.state_dict(),
@@ -143,7 +140,6 @@ def save_model(model, optimizer, args, filepath):
 
   torch.save(save_info, filepath)
   print(f"save the model to {filepath}")
-
 
 def train(args):
   """Train GPT-2 for paraphrase detection on the Quora dataset."""
@@ -206,7 +202,6 @@ def train(args):
     # TODO: consider a stopping condition to prevent overfitting on the small dataset of sonnets.
     save_model(model, optimizer, args, f'{epoch}_{args.filepath}')
 
-
 @torch.no_grad()
 def generate_submission_sonnets(args):
   device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -236,7 +231,6 @@ def generate_submission_sonnets(args):
     for sonnet in generated_sonnets:
       f.write(f"\n{sonnet[0]}\n")
       f.write(sonnet[1])
-
 
 def get_args():
   parser = argparse.ArgumentParser()
@@ -272,7 +266,6 @@ def get_args():
   args = parser.parse_args()
   return args
 
-
 def add_arguments(args):
   """Add arguments that are deterministic on model size."""
   if args.model_size == 'gpt2':
@@ -290,7 +283,6 @@ def add_arguments(args):
   else:
     raise Exception(f'{args.model_size} is not supported.')
   return args
-
 
 if __name__ == "__main__":
   args = get_args()

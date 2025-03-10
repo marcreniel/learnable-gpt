@@ -32,7 +32,6 @@ def seed_everything(seed=11711):
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
 
-
 class GPT2SentimentClassifier(torch.nn.Module):
   '''
   This module performs sentiment classification using GPT2 in a cloze-style (fill-in-the-blank) task.
@@ -65,6 +64,10 @@ class GPT2SentimentClassifier(torch.nn.Module):
     self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
     self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
 
+    # Collect Total Trainable Parameters
+    total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+    print(f"Total Trainable Parameters: {total_params}")
+
   def forward(self, input_ids, attention_mask):
     '''Takes a batch of sentences and returns logits for sentiment classes'''
 
@@ -86,7 +89,6 @@ class GPT2SentimentClassifier(torch.nn.Module):
     logits = self.classifier(self.dropout(last_token_hidden))
 
     return logits
-
 
 class SentimentDataset(Dataset):
   def __init__(self, dataset, args):
@@ -126,7 +128,6 @@ class SentimentDataset(Dataset):
 
     return batched_data
 
-
 class SentimentTestDataset(Dataset):
   def __init__(self, dataset, args):
     self.dataset = dataset
@@ -162,7 +163,6 @@ class SentimentTestDataset(Dataset):
 
     return batched_data
 
-
 # Load the data: a list of (sentence, label).
 def load_data(filename, flag='train'):
   num_labels = {}
@@ -188,7 +188,6 @@ def load_data(filename, flag='train'):
     return data, len(num_labels)
   else:
     return data
-
 
 # Evaluate the model on dev examples.
 def model_eval(dataloader, model, device):
@@ -217,7 +216,6 @@ def model_eval(dataloader, model, device):
   acc = accuracy_score(y_true, y_pred)
 
   return acc, f1, y_pred, y_true, sents, sent_ids
-
 
 # Evaluate the model on test examples.
 def model_test_eval(dataloader, model, device):
@@ -255,7 +253,6 @@ def save_model(model, optimizer, args, config, filepath):
 
   torch.save(save_info, filepath)
   print(f"save the model to {filepath}")
-
 
 def train(args):
   device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -339,7 +336,6 @@ def train(args):
 
     print(f"Epoch {epoch}: train loss :: {train_loss:.3f}, train acc :: {train_acc:.3f}, dev acc :: {dev_acc:.3f}")
 
-
 def test(args):
   with torch.no_grad():
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -377,7 +373,6 @@ def test(args):
       for p, s in zip(test_sent_ids, test_pred):
         f.write(f"{p}, {s} \n")
 
-
 def get_args():
   parser = argparse.ArgumentParser()
   parser.add_argument("--seed", type=int, default=11711)
@@ -400,7 +395,6 @@ def get_args():
 
   args = parser.parse_args()
   return args
-
 
 if __name__ == "__main__":
   args = get_args()

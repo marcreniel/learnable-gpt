@@ -4,7 +4,6 @@ from optimizer import AdamW
 
 SEED = 0
 
-
 def test_optimizer(opt_class) -> torch.Tensor:
     rng = np.random.default_rng(SEED)
     torch.manual_seed(SEED)

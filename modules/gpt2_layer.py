@@ -2,7 +2,6 @@ from torch import nn
 import torch.nn.functional as F
 from modules.attention import CausalSelfAttention
 from modules.kan_layer import KAN 
-from peft import LoraConfig
 from modules.graph_attention import GraphAttentionLayer
 
 class GPT2Layer(nn.Module):

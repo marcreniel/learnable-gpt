@@ -44,7 +44,6 @@ def seed_everything(seed=11711):
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
 
-
 class ParaphraseGPT(nn.Module):
   """Your GPT-2 Model designed for paraphrase detection."""
 
@@ -91,7 +90,6 @@ class ParaphraseGPT(nn.Module):
     # logits = self.gpt.hidden_state_to_token(logits)
     return logits
 
-
 def save_model(model, optimizer, args, filepath):
   save_info = {
     'model': model.state_dict(),
@@ -104,7 +102,6 @@ def save_model(model, optimizer, args, filepath):
 
   torch.save(save_info, filepath)
   print(f"save the model to {filepath}")
-
 
 def train(args):
   """Train GPT-2 for paraphrase detection on the Quora dataset."""
@@ -164,7 +161,6 @@ def train(args):
 
     print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, dev acc :: {dev_acc :.3f}")
 
-
 @torch.no_grad()
 def test(args):
   """Evaluate your model on the dev and test datasets; save the predictions to disk."""
@@ -202,7 +198,6 @@ def test(args):
     for p, s in zip(test_para_sent_ids, test_para_y_pred):
       f.write(f"{p}, {s} \n")
 
-
 def get_args():
   parser = argparse.ArgumentParser()
 
@@ -232,7 +227,6 @@ def get_args():
   args = parser.parse_args()
   return args
 
-
 def add_arguments(args):
   """Add arguments that are deterministic on model size."""
   if args.model_size == 'gpt2':
@@ -250,7 +244,6 @@ def add_arguments(args):
   else:
     raise Exception(f'{args.model_size} is not supported.')
   return args
-
 
 if __name__ == "__main__":
   args = get_args()

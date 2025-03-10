@@ -7,7 +7,6 @@ from models.base_gpt import GPTPreTrainedModel
 from modules.gpt2_layer import GPT2Layer
 from utils import get_extended_attention_mask
 
-
 class GPT2Model(GPTPreTrainedModel):
   """
   The GPT model returns the final embeddings for each token in a sentence.

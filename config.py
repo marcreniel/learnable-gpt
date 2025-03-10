@@ -9,7 +9,6 @@ import os
 import json
 from utils import CONFIG_NAME, hf_bucket_url, cached_path, is_remote_url
 
-
 class PretrainedConfig(object):
   model_type: str = ""
   is_composition: bool = False
@@ -183,7 +182,6 @@ class PretrainedConfig(object):
       raise EnvironmentError(msg)
 
     return config_dict, kwargs
-
 
 class GPT2Config(PretrainedConfig):
   model_type = "gpt"

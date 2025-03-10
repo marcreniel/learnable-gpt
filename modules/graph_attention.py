@@ -15,9 +15,9 @@ class GraphAttentionLayer(nn.Module):
         # Graph attention layer
         self.gat = GATConv(
             in_channels=self.hidden_size,
-            out_channels=self.hidden_size // self.num_attention_heads,  # Adjusted output size
+            out_channels=self.hidden_size // self.num_attention_heads,  
             heads=self.num_attention_heads,
-            concat=True,  # Concatenate head outputs
+            concat=True, 
             dropout=config.attention_probs_dropout_prob
         )
         
@@ -56,7 +56,7 @@ class GraphAttentionLayer(nn.Module):
             edge_index = self.build_graph(item)
             
             # Apply GAT layer
-            graph_output = self.gat(item, edge_index)  # [seq_len, hidden_size]
+            graph_output = self.gat(item, edge_index)  
             
             # Project if needed
             graph_output = self.gat_projection(graph_output)

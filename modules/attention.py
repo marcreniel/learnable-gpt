@@ -3,7 +3,6 @@ import torch
 from einops import rearrange
 from torch import nn
 
-
 class CausalSelfAttention(nn.Module):
   def __init__(self, config):
     super().__init__()
