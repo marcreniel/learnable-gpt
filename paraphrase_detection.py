@@ -1,4 +1,5 @@
-'''
+#!/usr/bin/env python
+"""
 Paraphrase detection for GPT starter code.
 
 Consider:
@@ -9,12 +10,11 @@ Consider:
 Running:
   `python paraphrase_detection.py --use_gpu`
 trains and evaluates your ParaphraseGPT model and writes the required submission files.
-'''
+"""
 
 import argparse
 import random
 import torch
-
 import numpy as np
 import torch.nn.functional as F
 
@@ -31,6 +31,8 @@ from evaluation import model_eval_paraphrase, model_test_paraphrase
 from models.gpt2 import GPT2Model
 
 from optimizer import AdamW
+
+import wandb 
 
 TQDM_DISABLE = False
 
@@ -76,7 +78,7 @@ class ParaphraseGPT(nn.Module):
 
     So you want to find the prediction for the next token at the end of this sentence. Optimistically, it will be the
     token "yes" (byte pair encoding index of 8505) for examples that are paraphrases or "no" (byte pair encoding index
-     of 3919) for examples that are not paraphrases.
+    of 3919) for examples that are not paraphrases.
     """
 
     'Takes a batch of sentences and produces embeddings for them.'
@@ -127,6 +129,9 @@ def train(args):
   optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
   best_dev_acc = 0
 
+  # Initialize W&B monitoring for the model (logs gradients and parameters).
+  wandb.watch(model, log="all", log_freq=10)
+
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
     model.train()
@@ -151,9 +156,15 @@ def train(args):
       train_loss += loss.item()
       num_batches += 1
 
+      # Log batch loss to Weights & Biases.
+      wandb.log({"train_loss_batch": loss.item()}) 
+
     train_loss = train_loss / num_batches
 
     dev_acc, dev_f1, *_ = model_eval_paraphrase(para_dev_dataloader, model, device)
+
+    # Log epoch metrics to Weights & Biases.
+    wandb.log({"epoch": epoch, "train_loss": train_loss, "dev_accuracy": dev_acc}) 
 
     if dev_acc > best_dev_acc:
       best_dev_acc = dev_acc
@@ -210,7 +221,6 @@ def get_args():
   parser.add_argument("--seed", type=int, default=11711)
   parser.add_argument("--epochs", type=int, default=10)
   parser.add_argument("--use_gpu", action='store_true')
-
   parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
   parser.add_argument("--model_size", type=str,
@@ -223,9 +233,7 @@ def get_args():
   parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention layer instead of standard linear layer")
   parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
   # END: Extention-implemented Flags
-
-  args = parser.parse_args()
-  return args
+  return parser.parse_args()
 
 def add_arguments(args):
   """Add arguments that are deterministic on model size."""
@@ -249,5 +257,6 @@ if __name__ == "__main__":
   args = get_args()
   args.filepath = f'{args.epochs}-{args.lr}-paraphrase.pt'  # Save path.
   seed_everything(args.seed)  # Fix the seed for reproducibility.
+  wandb.init(entity="lgpt_cs224n", project="cs224n_paraphrase", config=vars(args))
   train(args)
   test(args)

@@ -29,7 +29,6 @@ from models.gpt2 import GPT2Model
 from optimizer import AdamW
 
 import wandb
-import json 
 
 TQDM_DISABLE = False
 
@@ -258,9 +257,6 @@ def get_args():
   parser.add_argument("--use_lora", action='store_true', help="Use LoRA network.")
   parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention network.")
   parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
-  # Argument to provide a wandb configuration JSON file (optional)
-  parser.add_argument("--wandb_config_file", type=str, default="",
-                      help="Path to the W&B configuration JSON file (optional).") 
   # END: Extention-implemented Flags
 
   args = parser.parse_args()
@@ -287,19 +283,7 @@ def add_arguments(args):
 if __name__ == "__main__":
   args = get_args()
   args.filepath = f'{args.epochs}-{args.lr}-sonnet.pt'  # Save path.
-
-  # Initialize Weights & Biases using the configuration file if provided.
-  if args.wandb_config_file:
-    try:
-      with open(args.wandb_config_file, "r") as f:
-        wandb_config = json.load(f)
-      wandb.init(project=wandb_config.get("project", "cs224n_sonnet"), config=wandb_config)
-    except Exception as e:
-      print(f"Error loading wandb config file: {e}")
-      wandb.init(entity="lgpt_cs224n", project="cs224n_sonnet", config=vars(args))
-  else:
-    wandb.init(entity="lgpt_cs224n", project="cs224n_sonnet", config=vars(args))
-
+  wandb.init(entity="lgpt_cs224n", project="cs224n_sonnet", config=vars(args))
   seed_everything(args.seed)  # Fix the seed for reproducibility.
   train(args)
   generate_submission_sonnets(args)
