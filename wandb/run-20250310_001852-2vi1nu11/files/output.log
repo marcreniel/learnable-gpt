@@ -1,0 +1,43 @@
+model.safetensors:  88%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏                  | 2.85G/3.25G [00:04<01:19, 4.96MB/s]
+Traceback (most recent call last):
+  File "sonnet_generation.py", line 303, in <module>
+    train(args)
+  File "sonnet_generation.py", line 152, in train
+    model = SonnetGPT(args)
+  File "sonnet_generation.py", line 55, in __init__
+    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads, use_lora=args.use_lora, use_kan=args.use_kan, use_graph=args.use_graph)
+  File "/Users/marc/Documents/CS Work/CS224N/public_cs224n_gpt/models/gpt2.py", line 114, in from_pretrained
+    gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/transformers/modeling_utils.py", line 3809, in from_pretrained
+    resolved_archive_file = cached_file(pretrained_model_name_or_path, filename, **cached_file_kwargs)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/transformers/utils/hub.py", line 403, in cached_file
+    resolved_file = hf_hub_download(
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/huggingface_hub/file_download.py", line 862, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/huggingface_hub/file_download.py", line 1011, in _hf_hub_download_to_cache_dir
+    _download_to_tmp_and_move(
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/huggingface_hub/file_download.py", line 1547, in _download_to_tmp_and_move
+    http_get(
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/huggingface_hub/file_download.py", line 454, in http_get
+    for chunk in r.iter_content(chunk_size=constants.DOWNLOAD_CHUNK_SIZE):
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/requests/models.py", line 753, in generate
+    for chunk in self.raw.stream(chunk_size, decode_content=True):
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/urllib3/response.py", line 628, in stream
+    data = self.read(amt=amt, decode_content=decode_content)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/urllib3/response.py", line 567, in read
+    data = self._fp_read(amt) if not fp_closed else b""
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/site-packages/urllib3/response.py", line 533, in _fp_read
+    return self._fp.read(amt) if amt is not None else self._fp.read()
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/http/client.py", line 459, in read
+    n = self.readinto(b)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/http/client.py", line 503, in readinto
+    n = self.fp.readinto(b)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/socket.py", line 681, in readinto
+    return self._sock.recv_into(b)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/ssl.py", line 1274, in recv_into
+    return self.read(nbytes, buffer)
+  File "/opt/homebrew/anaconda3/envs/cs224n_dfp/lib/python3.8/ssl.py", line 1132, in read
+    return self._sslobj.read(len, buffer)
+KeyboardInterrupt

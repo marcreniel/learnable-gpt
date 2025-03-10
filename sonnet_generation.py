@@ -1,11 +1,12 @@
-'''
+#!/usr/bin/env python
+"""
 Sonnet generation starter code.
 
 Running:
   `python sonnet_generation.py --use_gpu`
 
 trains your SonnetGPT model and writes the required submission files.
-'''
+"""
 
 import argparse
 import random
@@ -26,6 +27,11 @@ from datasets import (
 from models.gpt2 import GPT2Model
 
 from optimizer import AdamW
+
+# NEW: Added for Weights & Biases integration.
+import wandb  # NEW: WandB for experiment tracking
+# NEW: Added for loading W&B configuration files.
+import json  # NEW: For parsing W&B config file
 
 TQDM_DISABLE = False
 
@@ -66,7 +72,6 @@ class SonnetGPT(nn.Module):
     return logits
     # raise NotImplementedError
 
-
   def get_device(self):
     for param in self.gpt.parameters():
       return param.device
@@ -82,7 +87,6 @@ class SonnetGPT(nn.Module):
     """
     token_ids = encoding.to(self.get_device())
     attention_mask = torch.ones(token_ids.shape, dtype=torch.int64).to(self.get_device())
-
 
     for _ in range(max_length):
       # Forward pass to get logits
@@ -152,6 +156,9 @@ def train(args):
   weight_decay = args.weight_decay
   optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
+  # NEW: Initialize W&B monitoring for the model (logs gradients and parameters).
+  wandb.watch(model, log="all", log_freq=10)  # NEW: W&B model monitoring
+
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
     model.train()
@@ -175,6 +182,9 @@ def train(args):
 
       train_loss += loss.item()
       num_batches += 1
+
+      # NEW: Log batch loss to Weights & Biases.
+      wandb.log({"train_loss_batch": loss.item()})  # NEW: Batch loss logging
 
     train_loss = train_loss / num_batches
     print(f"Epoch {epoch}: train loss :: {train_loss :.3f}.")
@@ -235,9 +245,6 @@ def get_args():
   parser.add_argument("--temperature", type=float, help="softmax temperature.", default=1.2)
   parser.add_argument("--top_p", type=float, help="Cumulative probability distribution for nucleus sampling.",
                       default=0.9)
-  parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
-  parser.add_argument('--use_graph', action='store_true',
-                     help='Use graph attention enhancement')
 
   parser.add_argument("--batch_size", help='The training batch size.', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
@@ -248,6 +255,10 @@ def get_args():
   parser.add_argument("--use_kan", action='store_true', help="Use KAN-MLP network.")
   parser.add_argument("--use_lora", action='store_true', help="Use LoRA network.")
   parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention network.")
+
+  # NEW: Argument to provide a wandb configuration JSON file (optional)
+  parser.add_argument("--wandb_config_file", type=str, default="",
+                      help="Path to the W&B configuration JSON file (optional).")  # NEW: WandB config file argument
 
   args = parser.parse_args()
   return args
@@ -275,6 +286,19 @@ def add_arguments(args):
 if __name__ == "__main__":
   args = get_args()
   args.filepath = f'{args.epochs}-{args.lr}-sonnet.pt'  # Save path.
+
+  # NEW: Initialize Weights & Biases using the configuration file if provided.
+  if args.wandb_config_file:
+    try:
+      with open(args.wandb_config_file, "r") as f:
+        wandb_config = json.load(f)
+      wandb.init(project=wandb_config.get("project", "default_project"), config=wandb_config)
+    except Exception as e:
+      print(f"Error loading wandb config file: {e}")
+      wandb.init(project="default_project", config=vars(args))
+  else:
+    wandb.init(entity="lgpt_cs224n",project="cs224n_sonnet", config=vars(args))
+
   seed_everything(args.seed)  # Fix the seed for reproducibility.
   train(args)
   generate_submission_sonnets(args)
