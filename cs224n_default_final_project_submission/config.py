@@ -207,8 +207,6 @@ class GPT2Config(PretrainedConfig):
           position_embedding_type="learnable",
           use_cache=True,
           use_kan=False,
-          use_lora=False,
-          use_graph=False,
           **kwargs
   ):
     super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -229,6 +227,5 @@ class GPT2Config(PretrainedConfig):
     self.position_embedding_type = position_embedding_type
     self.use_cache = use_cache
     self.use_kan = use_kan
-    self.use_lora = use_lora
-    self.use_graph = use_graph
+
 

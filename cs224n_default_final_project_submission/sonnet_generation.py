@@ -46,7 +46,7 @@ class SonnetGPT(nn.Module):
 
   def __init__(self, args):
     super().__init__()
-    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads, use_lora=args.use_lora, use_kan=args.use_kan, use_graph=args.use_graph)
+    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads)
     self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -149,8 +149,7 @@ def train(args):
   model = model.to(device)
 
   lr = args.lr
-  weight_decay = args.weight_decay
-  optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+  optimizer = AdamW(model.parameters(), lr=lr)
 
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
@@ -235,19 +234,11 @@ def get_args():
   parser.add_argument("--temperature", type=float, help="softmax temperature.", default=1.2)
   parser.add_argument("--top_p", type=float, help="Cumulative probability distribution for nucleus sampling.",
                       default=0.9)
-  parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
-  parser.add_argument('--use_graph', action='store_true',
-                     help='Use graph attention enhancement')
 
   parser.add_argument("--batch_size", help='The training batch size.', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
-  parser.add_argument("--weight_decay", type=float, help="weight decay", default=0.0)
   parser.add_argument("--model_size", type=str, help="The model size as specified on hugging face.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'], default='gpt2')
-  
-  parser.add_argument("--use_kan", action='store_true', help="Use KAN-MLP network.")
-  parser.add_argument("--use_lora", action='store_true', help="Use LoRA network.")
-  parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention network.")
 
   args = parser.parse_args()
   return args
