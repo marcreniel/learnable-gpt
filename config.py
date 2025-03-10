@@ -197,6 +197,7 @@ class GPT2Config(PretrainedConfig):
           intermediate_size=3072,
           hidden_act="gelu",
           hidden_dropout_prob=0.1,
+          hidden_hybrid_dropout_prob=0.1,
           attention_probs_dropout_prob=0.1,
           max_position_embeddings=1024,
           type_vocab_size=2,
@@ -220,6 +221,7 @@ class GPT2Config(PretrainedConfig):
     self.hidden_act = hidden_act
     self.intermediate_size = intermediate_size
     self.hidden_dropout_prob = hidden_dropout_prob
+    self.hidden_hybrid_dropout_prob = hidden_hybrid_dropout_prob
     self.attention_probs_dropout_prob = attention_probs_dropout_prob
     self.max_position_embeddings = max_position_embeddings
     self.type_vocab_size = type_vocab_size
@@ -228,7 +230,10 @@ class GPT2Config(PretrainedConfig):
     self.gradient_checkpointing = gradient_checkpointing
     self.position_embedding_type = position_embedding_type
     self.use_cache = use_cache
+    # Extention-implemented Flags
     self.use_kan = use_kan
     self.use_lora = use_lora
     self.use_graph = use_graph
+    # END: Extention-implemented Flags
+
 

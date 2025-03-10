@@ -43,8 +43,11 @@ class GPT2SentimentClassifier(torch.nn.Module):
     super(GPT2SentimentClassifier, self).__init__()
     self.num_labels = config.num_labels
     self.gpt = GPT2Model.from_pretrained(
+        # Extention-implemented Flags
         use_kan=config.use_kan,
         use_lora=config.use_lora,
+        use_graph=config.use_graph,
+        # END: Extention-implemented Flags
     )
 
     # Pretrain mode does not require updating GPT paramters.
@@ -274,8 +277,11 @@ def train(args):
     'hidden_size': 768,
     'data_dir': '.',
     'fine_tune_mode': args.fine_tune_mode,
+    # Extention-implemented Flags
     'use_kan': args.use_kan,
     'use_lora': args.use_lora,
+    'use_graph': args.use_graph,
+    # END: Extention-implemented Flags
       }
 
   config = SimpleNamespace(**config)
@@ -374,12 +380,12 @@ def get_args():
   parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
   parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                       default=1e-3)
-  # New flags to enable KAN layer
+  # Extention-implemented Flags
   parser.add_argument("--use_kan", action="store_true", help="Use KAN layer instead of MLP")
   parser.add_argument("--use_lora", action="store_true", help="Use LoRA layer instead of MLP")
-  parser.add_argument("--weight_decay", type=float, default=0.0)
-  parser.add_argument('--use_graph', action='store_true',
-                     help='Use graph attention enhancement')
+  parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
+  parser.add_argument('--use_graph', action='store_true', help='Use graph attention enhancement')
+  # END: Extention-implemented Flags
 
   args = parser.parse_args()
   return args
@@ -401,9 +407,12 @@ if __name__ == "__main__":
     dev='data/ids-sst-dev.csv',
     test='data/ids-sst-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
+    # Extention-implemented Flags
     use_kan=args.use_kan,
     use_lora=args.use_lora,
+    use_graph=args.use_graph,
     weight_decay=args.weight_decay,
+    # END: Extention-implemented Flags
     dev_out='predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-sst-test-out.csv'
   )
@@ -425,9 +434,12 @@ if __name__ == "__main__":
     dev='data/ids-cfimdb-dev.csv',
     test='data/ids-cfimdb-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
+    # Extention-implemented Flags
     use_kan=args.use_kan,
     use_lora=args.use_lora,
+    use_graph=args.use_graph,
     weight_decay=args.weight_decay,
+    # END: Extention-implemented Flags
     dev_out='predictions/' + args.fine_tune_mode + '-cfimdb-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-cfimdb-test-out.csv'
   )

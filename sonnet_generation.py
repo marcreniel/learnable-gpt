@@ -28,10 +28,8 @@ from models.gpt2 import GPT2Model
 
 from optimizer import AdamW
 
-# NEW: Added for Weights & Biases integration.
-import wandb  # NEW: WandB for experiment tracking
-# NEW: Added for loading W&B configuration files.
-import json  # NEW: For parsing W&B config file
+import wandb
+import json 
 
 TQDM_DISABLE = False
 
@@ -52,7 +50,17 @@ class SonnetGPT(nn.Module):
 
   def __init__(self, args):
     super().__init__()
-    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads, use_lora=args.use_lora, use_kan=args.use_kan, use_graph=args.use_graph)
+    self.gpt = GPT2Model.from_pretrained(
+      model=args.model_size, 
+      d=args.d, 
+      l=args.l, 
+      num_heads=args.num_heads, 
+      # Extention-implemented Flags
+      use_lora=args.use_lora, 
+      use_kan=args.use_kan,
+      use_graph=args.use_graph
+      # END: Extention-implemented Flags
+    )
     self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -156,8 +164,8 @@ def train(args):
   weight_decay = args.weight_decay
   optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-  # NEW: Initialize W&B monitoring for the model (logs gradients and parameters).
-  wandb.watch(model, log="all", log_freq=10)  # NEW: W&B model monitoring
+  # Initialize W&B monitoring for the model (logs gradients and parameters).
+  wandb.watch(model, log="all", log_freq=10) 
 
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
@@ -183,8 +191,8 @@ def train(args):
       train_loss += loss.item()
       num_batches += 1
 
-      # NEW: Log batch loss to Weights & Biases.
-      wandb.log({"train_loss_batch": loss.item()})  # NEW: Batch loss logging
+      # Log batch loss to Weights & Biases.
+      wandb.log({"train_loss_batch": loss.item()})  
 
     train_loss = train_loss / num_batches
     print(f"Epoch {epoch}: train loss :: {train_loss :.3f}.")
@@ -248,17 +256,18 @@ def get_args():
 
   parser.add_argument("--batch_size", help='The training batch size.', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
-  parser.add_argument("--weight_decay", type=float, help="weight decay", default=0.0)
   parser.add_argument("--model_size", type=str, help="The model size as specified on hugging face.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'], default='gpt2')
   
+  # Extention-implemented Flags
   parser.add_argument("--use_kan", action='store_true', help="Use KAN-MLP network.")
   parser.add_argument("--use_lora", action='store_true', help="Use LoRA network.")
   parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention network.")
-
-  # NEW: Argument to provide a wandb configuration JSON file (optional)
+  parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
+  # Argument to provide a wandb configuration JSON file (optional)
   parser.add_argument("--wandb_config_file", type=str, default="",
-                      help="Path to the W&B configuration JSON file (optional).")  # NEW: WandB config file argument
+                      help="Path to the W&B configuration JSON file (optional).") 
+  # END: Extention-implemented Flags
 
   args = parser.parse_args()
   return args
@@ -287,7 +296,7 @@ if __name__ == "__main__":
   args = get_args()
   args.filepath = f'{args.epochs}-{args.lr}-sonnet.pt'  # Save path.
 
-  # NEW: Initialize Weights & Biases using the configuration file if provided.
+  # Initialize Weights & Biases using the configuration file if provided.
   if args.wandb_config_file:
     try:
       with open(args.wandb_config_file, "r") as f:

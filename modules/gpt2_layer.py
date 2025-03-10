@@ -28,6 +28,7 @@ class GPT2Layer(nn.Module):
             print("Using KAN-MLP network")
             self.interm_kan = KAN(layers_hidden=[config.hidden_size, config.intermediate_size])
             self.interm_af = F.gelu
+            self.interm_dropout = nn.Dropout(config.hidden_hybrid_dropout_prob)
             self.out_kan = KAN(layers_hidden=[config.intermediate_size, config.hidden_size])
         # LoRA network (if enabled).
         elif getattr(config, "use_lora", False):
@@ -37,7 +38,7 @@ class GPT2Layer(nn.Module):
             self.interm_af = F.gelu
             self.out_dense = LoRALinear(config.intermediate_size, config.hidden_size, lora_config=config.lora_config)
         else:
-            # Feed forward block.
+            # Feed forward block (Base Model).
             self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
             self.interm_af = F.gelu
             self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)

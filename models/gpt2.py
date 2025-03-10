@@ -118,14 +118,15 @@ class GPT2Model(GPTPreTrainedModel):
           num_hidden_layers=l,
           num_attention_heads=num_heads,
           intermediate_size=d*4,
+          # Extra flags for KAN, LoRA, and graph attention.
           use_kan=use_kan,
           use_lora=use_lora,
           use_graph=use_graph
       )
+      # Add new LoRA configs if enabled.
       if use_lora:
           from peft import LoraConfig
-          # You can adjust these values (r, dropout, alpha) as needed.
-          config.lora_config = LoraConfig(r=8)
+          config.lora_config = LoraConfig(r=16)
           config.lora_config.alpha = 32
           config.lora_config.dropout = 0.1
       our_model = GPT2Model(config).eval()

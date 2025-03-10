@@ -50,15 +50,16 @@ class ParaphraseGPT(nn.Module):
 
   def __init__(self, args):
     super().__init__()
-    # CHANGED: Added use_lora flag to enable LoRA when provided.
     self.gpt = GPT2Model.from_pretrained(
       model=args.model_size,
       d=args.d,
       l=args.l,
       num_heads=args.num_heads,
+      # Extention-implemented Flags
       use_lora=args.use_lora,
       use_kan=args.use_kan,
-      use_graph=args.use_graph
+      use_graph=args.use_graph,
+      # END: Extention-implemented Flags
     )
     self.paraphrase_detection_head = nn.Linear(args.d, 2)
 
@@ -217,15 +218,16 @@ def get_args():
 
   parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
-  parser.add_argument("--weight_decay", type=float, help="weight decay", default=0.0)
   parser.add_argument("--model_size", type=str,
                       help="The model size as specified on hugging face. DO NOT use the xl model.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large'], default='gpt2')
 
-  # New Flags
+  # Extention-implemented Flags
   parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
   parser.add_argument("--use_kan", action='store_true', help="Use KAN layer instead of standard linear layer")
   parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention layer instead of standard linear layer")
+  parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
+  # END: Extention-implemented Flags
 
   args = parser.parse_args()
   return args
