@@ -18,12 +18,12 @@ class GPT2Layer(nn.Module):
         if getattr(config, "use_kan", False) and getattr(config, "use_lora", False):
             from modules.lorakan_layer import LoRAKAN
             # LoRAKAN-MLP network.
-            print("Using LoRA-KAN-NLP network")
+            print("Using LoRA-KAN network")
             self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, int(config.hidden_size*1.5)], lora_config=config.lora_config)
             self.out_kan = LoRAKAN(layers_hidden=[int(config.hidden_size*1.5), config.hidden_size], lora_config=config.lora_config)
         elif getattr(config, "use_kan", False):
             # KAN-MLP network.
-            print("Using KAN-MLP network")
+            print("Using KAN network")
             self.interm_kan = KAN(layers_hidden=[config.hidden_size, int(config.hidden_size*1.5)])
             self.out_kan = KAN(layers_hidden=[config.hidden_size, int(config.hidden_size*1.5)])
         # LoRA network (if enabled).
