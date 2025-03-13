@@ -36,8 +36,6 @@ HUGGINGFACE_CO_PREFIX = "https://huggingface.co/{model_id}/resolve/{revision}/{f
 WEIGHTS_NAME = "pytorch_model.bin"
 CONFIG_NAME = "config.json"
 
-
-
 def model_size_to_params(model_size):
   if model_size == 'gpt2':
     return {'d':768, 'l':12, 'num_heads':12}
@@ -51,15 +49,12 @@ def model_size_to_params(model_size):
 def is_torch_available():
   return True
 
-
 def is_tf_available():
   return False
-
 
 def is_remote_url(url_or_filename):
   parsed = urlparse(url_or_filename)
   return parsed.scheme in ("http", "https")
-
 
 def http_get(url: str, temp_file: BinaryIO, proxies=None, resume_size=0, headers: Optional[Dict[str, str]] = None):
   headers = copy.deepcopy(headers)
@@ -83,7 +78,6 @@ def http_get(url: str, temp_file: BinaryIO, proxies=None, resume_size=0, headers
       temp_file.write(chunk)
   progress.close()
 
-
 def url_to_filename(url: str, etag: Optional[str] = None) -> str:
   url_bytes = url.encode("utf-8")
   filename = sha256(url_bytes).hexdigest()
@@ -96,7 +90,6 @@ def url_to_filename(url: str, etag: Optional[str] = None) -> str:
     filename += ".h5"
 
   return filename
-
 
 def hf_bucket_url(
   model_id: str, filename: str, subfolder: Optional[str] = None, revision: Optional[str] = None, mirror=None
@@ -116,7 +109,6 @@ def hf_bucket_url(
     revision = "main"
   return HUGGINGFACE_CO_PREFIX.format(model_id=model_id, revision=revision, filename=filename)
 
-
 def http_user_agent(user_agent: Union[Dict, str, None] = None) -> str:
   ua = "transformers/{}; python/{}".format(__version__, sys.version.split()[0])
   if is_torch_available():
@@ -128,7 +120,6 @@ def http_user_agent(user_agent: Union[Dict, str, None] = None) -> str:
   elif isinstance(user_agent, str):
     ua += "; " + user_agent
   return ua
-
 
 def get_from_cache(
   url: str,
@@ -259,7 +250,6 @@ def get_from_cache(
 
   return cache_path
 
-
 def cached_path(
   url_or_filename,
   cache_dir=None,
@@ -334,7 +324,6 @@ def cached_path(
 
   return output_path
 
-
 def get_parameter_dtype(parameter: Union[nn.Module]):
   try:
     return next(parameter.parameters()).dtype
@@ -348,7 +337,6 @@ def get_parameter_dtype(parameter: Union[nn.Module]):
     gen = parameter._named_members(get_members_fn=find_tensor_attributes)
     first_tuple = next(gen)
     return first_tuple[1].dtype
-
 
 def get_extended_attention_mask(attention_mask: Tensor, dtype) -> Tensor:
   # attention_mask [batch_size, seq_length]

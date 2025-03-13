@@ -7,7 +7,6 @@ from models.base_gpt import GPTPreTrainedModel
 from modules.gpt2_layer import GPT2Layer
 from utils import get_extended_attention_mask
 
-
 class GPT2Model(GPTPreTrainedModel):
   """
   The GPT model returns the final embeddings for each token in a sentence.
@@ -110,7 +109,7 @@ class GPT2Model(GPTPreTrainedModel):
     return torch.matmul(hidden_state, self.word_embedding.weight.T)
 
   @classmethod
-  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False):
+  def from_pretrained(cls, model='gpt2', d=768, l=12, num_heads=12, use_kan=False, use_lora=False, use_graph=False):
       gpt_model = OpenAIGPT2Model.from_pretrained(model).eval()
       # Config with KAN support.
       config = GPT2Config(
@@ -118,13 +117,15 @@ class GPT2Model(GPTPreTrainedModel):
           num_hidden_layers=l,
           num_attention_heads=num_heads,
           intermediate_size=d*4,
+          # Extra flags for KAN, LoRA, and graph attention.
           use_kan=use_kan,
-          use_lora=use_lora
+          use_lora=use_lora,
+          use_graph=use_graph
       )
+      # Add new LoRA configs if enabled.
       if use_lora:
           from peft import LoraConfig
-          # You can adjust these values (r, dropout, alpha) as needed.
-          config.lora_config = LoraConfig(r=8)
+          config.lora_config = LoraConfig(r=16)
           config.lora_config.alpha = 32
           config.lora_config.dropout = 0.1
       our_model = GPT2Model(config).eval()

@@ -9,7 +9,6 @@ import os
 import json
 from utils import CONFIG_NAME, hf_bucket_url, cached_path, is_remote_url
 
-
 class PretrainedConfig(object):
   model_type: str = ""
   is_composition: bool = False
@@ -184,7 +183,6 @@ class PretrainedConfig(object):
 
     return config_dict, kwargs
 
-
 class GPT2Config(PretrainedConfig):
   model_type = "gpt"
 
@@ -197,6 +195,7 @@ class GPT2Config(PretrainedConfig):
           intermediate_size=3072,
           hidden_act="gelu",
           hidden_dropout_prob=0.1,
+          hidden_hybrid_dropout_prob=0.1,
           attention_probs_dropout_prob=0.1,
           max_position_embeddings=1024,
           type_vocab_size=2,
@@ -208,6 +207,7 @@ class GPT2Config(PretrainedConfig):
           use_cache=True,
           use_kan=False,
           use_lora=False,
+          use_graph=False,
           **kwargs
   ):
     super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -219,6 +219,7 @@ class GPT2Config(PretrainedConfig):
     self.hidden_act = hidden_act
     self.intermediate_size = intermediate_size
     self.hidden_dropout_prob = hidden_dropout_prob
+    self.hidden_hybrid_dropout_prob = hidden_hybrid_dropout_prob
     self.attention_probs_dropout_prob = attention_probs_dropout_prob
     self.max_position_embeddings = max_position_embeddings
     self.type_vocab_size = type_vocab_size
@@ -227,7 +228,10 @@ class GPT2Config(PretrainedConfig):
     self.gradient_checkpointing = gradient_checkpointing
     self.position_embedding_type = position_embedding_type
     self.use_cache = use_cache
+    # Extention-implemented Flags
     self.use_kan = use_kan
     self.use_lora = use_lora
+    self.use_graph = use_graph
+    # END: Extention-implemented Flags
 
 

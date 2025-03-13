@@ -1,4 +1,5 @@
-'''
+#!/usr/bin/env python
+"""
 Paraphrase detection for GPT starter code.
 
 Consider:
@@ -9,12 +10,11 @@ Consider:
 Running:
   `python paraphrase_detection.py --use_gpu`
 trains and evaluates your ParaphraseGPT model and writes the required submission files.
-'''
+"""
 
 import argparse
 import random
 import torch
-
 import numpy as np
 import torch.nn.functional as F
 
@@ -32,6 +32,8 @@ from models.gpt2 import GPT2Model
 
 from optimizer import AdamW
 
+import wandb 
+
 TQDM_DISABLE = False
 
 # Fix the random seed.
@@ -44,19 +46,21 @@ def seed_everything(seed=11711):
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
 
-
 class ParaphraseGPT(nn.Module):
   """Your GPT-2 Model designed for paraphrase detection."""
 
   def __init__(self, args):
     super().__init__()
-    # CHANGED: Added use_lora flag to enable LoRA when provided.
     self.gpt = GPT2Model.from_pretrained(
       model=args.model_size,
       d=args.d,
       l=args.l,
       num_heads=args.num_heads,
-      use_lora=args.use_lora
+      # Extention-implemented Flags
+      use_lora=args.use_lora,
+      use_kan=args.use_kan,
+      use_graph=args.use_graph,
+      # END: Extention-implemented Flags
     )
     self.paraphrase_detection_head = nn.Linear(args.d, 2)
 
@@ -74,7 +78,7 @@ class ParaphraseGPT(nn.Module):
 
     So you want to find the prediction for the next token at the end of this sentence. Optimistically, it will be the
     token "yes" (byte pair encoding index of 8505) for examples that are paraphrases or "no" (byte pair encoding index
-     of 3919) for examples that are not paraphrases.
+    of 3919) for examples that are not paraphrases.
     """
 
     'Takes a batch of sentences and produces embeddings for them.'
@@ -88,7 +92,6 @@ class ParaphraseGPT(nn.Module):
     # logits = self.gpt.hidden_state_to_token(logits)
     return logits
 
-
 def save_model(model, optimizer, args, filepath):
   save_info = {
     'model': model.state_dict(),
@@ -101,7 +104,6 @@ def save_model(model, optimizer, args, filepath):
 
   torch.save(save_info, filepath)
   print(f"save the model to {filepath}")
-
 
 def train(args):
   """Train GPT-2 for paraphrase detection on the Quora dataset."""
@@ -127,6 +129,9 @@ def train(args):
   optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
   best_dev_acc = 0
 
+  # Initialize W&B monitoring for the model (logs gradients and parameters).
+  wandb.watch(model, log="all", log_freq=10)
+
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
     model.train()
@@ -151,16 +156,21 @@ def train(args):
       train_loss += loss.item()
       num_batches += 1
 
+      # Log batch loss to Weights & Biases.
+      wandb.log({"train_loss_batch": loss.item()}) 
+
     train_loss = train_loss / num_batches
 
     dev_acc, dev_f1, *_ = model_eval_paraphrase(para_dev_dataloader, model, device)
+
+    # Log epoch metrics to Weights & Biases.
+    wandb.log({"epoch": epoch, "train_loss": train_loss, "dev_accuracy": dev_acc}) 
 
     if dev_acc > best_dev_acc:
       best_dev_acc = dev_acc
       save_model(model, optimizer, args, args.filepath)
 
     print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, dev acc :: {dev_acc :.3f}")
-
 
 @torch.no_grad()
 def test(args):
@@ -199,7 +209,6 @@ def test(args):
     for p, s in zip(test_para_sent_ids, test_para_y_pred):
       f.write(f"{p}, {s} \n")
 
-
 def get_args():
   parser = argparse.ArgumentParser()
 
@@ -212,20 +221,19 @@ def get_args():
   parser.add_argument("--seed", type=int, default=11711)
   parser.add_argument("--epochs", type=int, default=10)
   parser.add_argument("--use_gpu", action='store_true')
-
   parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
-  parser.add_argument("--weight_decay", type=float, help="weight decay", default=0.0)
   parser.add_argument("--model_size", type=str,
                       help="The model size as specified on hugging face. DO NOT use the xl model.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large'], default='gpt2')
 
-  # New Flags
+  # Extention-implemented Flags
   parser.add_argument("--use_lora", action='store_true', help="Use LoRA layer instead of standard linear layer")
-
-  args = parser.parse_args()
-  return args
-
+  parser.add_argument("--use_kan", action='store_true', help="Use KAN layer instead of standard linear layer")
+  parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention layer instead of standard linear layer")
+  parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
+  # END: Extention-implemented Flags
+  return parser.parse_args()
 
 def add_arguments(args):
   """Add arguments that are deterministic on model size."""
@@ -245,10 +253,10 @@ def add_arguments(args):
     raise Exception(f'{args.model_size} is not supported.')
   return args
 
-
 if __name__ == "__main__":
   args = get_args()
   args.filepath = f'{args.epochs}-{args.lr}-paraphrase.pt'  # Save path.
   seed_everything(args.seed)  # Fix the seed for reproducibility.
+  wandb.init(entity="lgpt_cs224n", project="cs224n_paraphrase", config=vars(args))
   train(args)
   test(args)

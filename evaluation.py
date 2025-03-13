@@ -18,7 +18,6 @@ from datasets import (
 
 TQDM_DISABLE = False
 
-
 @torch.no_grad()
 def model_eval_paraphrase(dataloader, model, device):
   model.eval()  # Switch to eval model, will turn off randomness like dropout.
@@ -43,7 +42,6 @@ def model_eval_paraphrase(dataloader, model, device):
 
   return acc, f1, y_pred, y_true, sent_ids
 
-
 @torch.no_grad()
 def model_test_paraphrase(dataloader, model, device):
   model.eval()  # Switch to eval model, will turn off randomness like dropout.
@@ -61,7 +59,6 @@ def model_test_paraphrase(dataloader, model, device):
     sent_ids.extend(b_sent_ids)
 
   return y_pred, sent_ids
-
 
 def test_sonnet(
     test_path='predictions/generated_sonnets.txt',

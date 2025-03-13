@@ -1,11 +1,12 @@
-'''
+#!/usr/bin/env python
+"""
 Sonnet generation starter code.
 
 Running:
   `python sonnet_generation.py --use_gpu`
 
 trains your SonnetGPT model and writes the required submission files.
-'''
+"""
 
 import argparse
 import random
@@ -27,8 +28,9 @@ from models.gpt2 import GPT2Model
 
 from optimizer import AdamW
 
-TQDM_DISABLE = False
+import wandb
 
+TQDM_DISABLE = False
 
 # Fix the random seed.
 def seed_everything(seed=11711):
@@ -40,13 +42,22 @@ def seed_everything(seed=11711):
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
 
-
 class SonnetGPT(nn.Module):
   """Your GPT-2 Model designed for paraphrase detection."""
 
   def __init__(self, args):
     super().__init__()
-    self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads)
+    self.gpt = GPT2Model.from_pretrained(
+      model=args.model_size, 
+      d=args.d, 
+      l=args.l, 
+      num_heads=args.num_heads, 
+      # Extention-implemented Flags
+      use_lora=args.use_lora, 
+      use_kan=args.use_kan,
+      use_graph=args.use_graph
+      # END: Extention-implemented Flags
+    )
     self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -66,7 +77,6 @@ class SonnetGPT(nn.Module):
     return logits
     # raise NotImplementedError
 
-
   def get_device(self):
     for param in self.gpt.parameters():
       return param.device
@@ -82,7 +92,6 @@ class SonnetGPT(nn.Module):
     """
     token_ids = encoding.to(self.get_device())
     attention_mask = torch.ones(token_ids.shape, dtype=torch.int64).to(self.get_device())
-
 
     for _ in range(max_length):
       # Forward pass to get logits
@@ -118,7 +127,6 @@ class SonnetGPT(nn.Module):
     generated_output = self.tokenizer.decode(token_ids[0].cpu().numpy().tolist())[3:]
     return token_ids, generated_output
 
-
 def save_model(model, optimizer, args, filepath):
   save_info = {
     'model': model.state_dict(),
@@ -131,7 +139,6 @@ def save_model(model, optimizer, args, filepath):
 
   torch.save(save_info, filepath)
   print(f"save the model to {filepath}")
-
 
 def train(args):
   """Train GPT-2 for paraphrase detection on the Quora dataset."""
@@ -151,6 +158,9 @@ def train(args):
   lr = args.lr
   weight_decay = args.weight_decay
   optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+  # Initialize W&B monitoring for the model (logs gradients and parameters).
+  wandb.watch(model, log="all", log_freq=10) 
 
   # Run for the specified number of epochs.
   for epoch in range(args.epochs):
@@ -176,6 +186,9 @@ def train(args):
       train_loss += loss.item()
       num_batches += 1
 
+      # Log batch loss to Weights & Biases.
+      wandb.log({"train_loss_batch": loss.item()})  
+
     train_loss = train_loss / num_batches
     print(f"Epoch {epoch}: train loss :: {train_loss :.3f}.")
     print('Generating several output sonnets...')
@@ -187,7 +200,6 @@ def train(args):
 
     # TODO: consider a stopping condition to prevent overfitting on the small dataset of sonnets.
     save_model(model, optimizer, args, f'{epoch}_{args.filepath}')
-
 
 @torch.no_grad()
 def generate_submission_sonnets(args):
@@ -219,7 +231,6 @@ def generate_submission_sonnets(args):
       f.write(f"\n{sonnet[0]}\n")
       f.write(sonnet[1])
 
-
 def get_args():
   parser = argparse.ArgumentParser()
 
@@ -238,13 +249,18 @@ def get_args():
 
   parser.add_argument("--batch_size", help='The training batch size.', type=int, default=8)
   parser.add_argument("--lr", type=float, help="learning rate", default=1e-5)
-  parser.add_argument("--weight_decay", type=float, help="weight decay", default=0.0)
   parser.add_argument("--model_size", type=str, help="The model size as specified on hugging face.",
                       choices=['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'], default='gpt2')
+  
+  # Extention-implemented Flags
+  parser.add_argument("--use_kan", action='store_true', help="Use KAN-MLP network.")
+  parser.add_argument("--use_lora", action='store_true', help="Use LoRA network.")
+  parser.add_argument("--use_graph", action='store_true', help="Use Graph Attention network.")
+  parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
+  # END: Extention-implemented Flags
 
   args = parser.parse_args()
   return args
-
 
 def add_arguments(args):
   """Add arguments that are deterministic on model size."""
@@ -264,10 +280,10 @@ def add_arguments(args):
     raise Exception(f'{args.model_size} is not supported.')
   return args
 
-
 if __name__ == "__main__":
   args = get_args()
   args.filepath = f'{args.epochs}-{args.lr}-sonnet.pt'  # Save path.
+  wandb.init(entity="lgpt_cs224n", project="cs224n_sonnet", config=vars(args))
   seed_everything(args.seed)  # Fix the seed for reproducibility.
   train(args)
   generate_submission_sonnets(args)

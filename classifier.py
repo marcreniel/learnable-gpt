@@ -18,6 +18,8 @@ from models.gpt2 import GPT2Model
 from optimizer import AdamW
 from tqdm import tqdm
 
+import wandb 
+
 TQDM_DISABLE = False
 
 # Fix the random seed.
@@ -29,7 +31,6 @@ def seed_everything(seed=11711):
   torch.cuda.manual_seed_all(seed)
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
-
 
 class GPT2SentimentClassifier(torch.nn.Module):
   '''
@@ -43,8 +44,11 @@ class GPT2SentimentClassifier(torch.nn.Module):
     super(GPT2SentimentClassifier, self).__init__()
     self.num_labels = config.num_labels
     self.gpt = GPT2Model.from_pretrained(
+        # Extention-implemented Flags
         use_kan=config.use_kan,
         use_lora=config.use_lora,
+        use_graph=config.use_graph,
+        # END: Extention-implemented Flags
     )
 
     # Pretrain mode does not require updating GPT paramters.
@@ -60,6 +64,10 @@ class GPT2SentimentClassifier(torch.nn.Module):
     self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
     self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
 
+    # Collect Total Trainable Parameters
+    total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+    print(f"Total Trainable Parameters: {total_params}")
+
   def forward(self, input_ids, attention_mask):
     '''Takes a batch of sentences and returns logits for sentiment classes'''
 
@@ -71,7 +79,7 @@ class GPT2SentimentClassifier(torch.nn.Module):
     last_hidden_states = outputs['last_hidden_state']
 
     # Compute the index of the last non-padding token for each sequence.
-    last_token_indices = attention_mask.sum(dim=1) - 1 # (batch_size,)
+    last_token_indices = attention_mask.sum(dim=1) - 1  # (batch_size,)
 
     # Gather the last token hidden state for each sequence.
     batch_size = last_hidden_states.shape[0]
@@ -120,7 +128,6 @@ class SentimentDataset(Dataset):
 
     return batched_data
 
-
 class SentimentTestDataset(Dataset):
   def __init__(self, dataset, args):
     self.dataset = dataset
@@ -156,7 +163,6 @@ class SentimentTestDataset(Dataset):
 
     return batched_data
 
-
 # Load the data: a list of (sentence, label).
 def load_data(filename, flag='train'):
   num_labels = {}
@@ -183,17 +189,15 @@ def load_data(filename, flag='train'):
   else:
     return data
 
-
 # Evaluate the model on dev examples.
 def model_eval(dataloader, model, device):
-  model.eval()  # Switch to eval model, will turn off randomness like dropout.
+  model.eval()  # Switch to eval mode, will turn off randomness like dropout.
   y_true = []
   y_pred = []
   sents = []
   sent_ids = []
-  for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
-    b_ids, b_mask, b_labels, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], \
-                                                   batch['labels'], batch['sents'], batch['sent_ids']
+  for step, batch in enumerate(tqdm(dataloader, desc='eval', disable=TQDM_DISABLE)):
+    b_ids, b_mask, b_labels, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], batch['labels'], batch['sents'], batch['sent_ids']
 
     b_ids = b_ids.to(device)
     b_mask = b_mask.to(device)
@@ -213,16 +217,14 @@ def model_eval(dataloader, model, device):
 
   return acc, f1, y_pred, y_true, sents, sent_ids
 
-
 # Evaluate the model on test examples.
 def model_test_eval(dataloader, model, device):
-  model.eval()  # Switch to eval model, will turn off randomness like dropout.
+  model.eval()  # Switch to eval mode, will turn off randomness like dropout.
   y_pred = []
   sents = []
   sent_ids = []
-  for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
-    b_ids, b_mask, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], \
-                                         batch['sents'], batch['sent_ids']
+  for step, batch in enumerate(tqdm(dataloader, desc='eval', disable=TQDM_DISABLE)):
+    b_ids, b_mask, b_sents, b_sent_ids = batch['token_ids'], batch['attention_mask'], batch['sents'], batch['sent_ids']
 
     b_ids = b_ids.to(device)
     b_mask = b_mask.to(device)
@@ -252,7 +254,6 @@ def save_model(model, optimizer, args, config, filepath):
   torch.save(save_info, filepath)
   print(f"save the model to {filepath}")
 
-
 def train(args):
   device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
   # Create the data and its corresponding datasets and dataloader.
@@ -274,14 +275,19 @@ def train(args):
     'hidden_size': 768,
     'data_dir': '.',
     'fine_tune_mode': args.fine_tune_mode,
+    # Extention-implemented Flags
     'use_kan': args.use_kan,
     'use_lora': args.use_lora,
-      }
-
+    'use_graph': args.use_graph,
+    # END: Extention-implemented Flags
+  }
   config = SimpleNamespace(**config)
 
   model = GPT2SentimentClassifier(config)
   model = model.to(device)
+  
+  # Added WandB watch to log gradients and parameters.
+  wandb.watch(model, log="all", log_freq=100)
 
   lr = args.lr
   weight_decay = args.weight_decay
@@ -294,8 +300,7 @@ def train(args):
     train_loss = 0
     num_batches = 0
     for batch in tqdm(train_dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE):
-      b_ids, b_mask, b_labels = (batch['token_ids'],
-                                 batch['attention_mask'], batch['labels'])
+      b_ids, b_mask, b_labels = batch['token_ids'], batch['attention_mask'], batch['labels']
 
       b_ids = b_ids.to(device)
       b_mask = b_mask.to(device)
@@ -311,17 +316,25 @@ def train(args):
       train_loss += loss.item()
       num_batches += 1
 
-    train_loss = train_loss / (num_batches)
+    train_loss = train_loss / num_batches
 
     train_acc, train_f1, *_ = model_eval(train_dataloader, model, device)
     dev_acc, dev_f1, *_ = model_eval(dev_dataloader, model, device)
+
+    # WandB logging of epoch-level metrics.
+    wandb.log({
+      "epoch": epoch,
+      "train_loss": train_loss,
+      "train_acc": train_acc,
+      "dev_acc": dev_acc,
+      "dev_f1": dev_f1
+    })
 
     if dev_acc > best_dev_acc:
       best_dev_acc = dev_acc
       save_model(model, optimizer, args, config, args.filepath)
 
-    print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
-
+    print(f"Epoch {epoch}: train loss :: {train_loss:.3f}, train acc :: {train_acc:.3f}, dev acc :: {dev_acc:.3f}")
 
 def test(args):
   with torch.no_grad():
@@ -350,16 +363,15 @@ def test(args):
     print('DONE Test')
 
     with open(args.dev_out, "w+") as f:
-      print(f"dev acc :: {dev_acc :.3f}")
-      f.write(f"id \t Predicted_Sentiment \n")
+      print(f"dev acc :: {dev_acc:.3f}")
+      f.write("id \t Predicted_Sentiment \n")
       for p, s in zip(dev_sent_ids, dev_pred):
         f.write(f"{p}, {s} \n")
 
     with open(args.test_out, "w+") as f:
-      f.write(f"id \t Predicted_Sentiment \n")
+      f.write("id \t Predicted_Sentiment \n")
       for p, s in zip(test_sent_ids, test_pred):
         f.write(f"{p}, {s} \n")
-
 
 def get_args():
   parser = argparse.ArgumentParser()
@@ -374,19 +386,21 @@ def get_args():
   parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
   parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                       default=1e-3)
-  # New flags to enable KAN layer
+  # Extention-implemented Flags
   parser.add_argument("--use_kan", action="store_true", help="Use KAN layer instead of MLP")
   parser.add_argument("--use_lora", action="store_true", help="Use LoRA layer instead of MLP")
-  parser.add_argument("--weight_decay", type=float, default=0.0)
+  parser.add_argument("--weight_decay", type=float, help="L2 Weight Decay", default=0.0)
+  parser.add_argument('--use_graph', action='store_true', help='Use graph attention enhancement')
+  # END: Extention-implemented Flags
 
   args = parser.parse_args()
   return args
-
 
 if __name__ == "__main__":
   args = get_args()
   seed_everything(args.seed)
 
+  wandb.init(entity="lgpt_cs224n", project="cs224n_classifier", config=vars(args))
   print('Training Sentiment Classifier on SST...')
   config = SimpleNamespace(
     filepath='sst-classifier.pt',
@@ -399,18 +413,22 @@ if __name__ == "__main__":
     dev='data/ids-sst-dev.csv',
     test='data/ids-sst-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
+    # Extention-implemented Flags
     use_kan=args.use_kan,
     use_lora=args.use_lora,
+    use_graph=args.use_graph,
     weight_decay=args.weight_decay,
+    # END: Extention-implemented Flags
     dev_out='predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-sst-test-out.csv'
   )
 
   train(config)
-
   print('Evaluating on SST...')
   test(config)
+  wandb.finish()
 
+  wandb.init(entity="lgpt_cs224n", project="cs224n_classifier", config=vars(args))
   print('Training Sentiment Classifier on cfimdb...')
   config = SimpleNamespace(
     filepath='cfimdb-classifier.pt',
@@ -423,14 +441,17 @@ if __name__ == "__main__":
     dev='data/ids-cfimdb-dev.csv',
     test='data/ids-cfimdb-test-student.csv',
     fine_tune_mode=args.fine_tune_mode,
+    # Extention-implemented Flags
     use_kan=args.use_kan,
     use_lora=args.use_lora,
+    use_graph=args.use_graph,
     weight_decay=args.weight_decay,
+    # END: Extention-implemented Flags
     dev_out='predictions/' + args.fine_tune_mode + '-cfimdb-dev-out.csv',
     test_out='predictions/' + args.fine_tune_mode + '-cfimdb-test-out.csv'
   )
 
   train(config)
-
   print('Evaluating on cfimdb...')
   test(config)
+  wandb.finish()

@@ -2,7 +2,7 @@ from torch import nn
 import torch.nn.functional as F
 from modules.attention import CausalSelfAttention
 from modules.kan_layer import KAN 
-from peft import LoraConfig
+from modules.graph_attention import GraphAttentionLayer
 
 class GPT2Layer(nn.Module):
     def __init__(self, config):
@@ -16,19 +16,18 @@ class GPT2Layer(nn.Module):
 
         # KAN network (if enabled).
         if getattr(config, "use_kan", False) and getattr(config, "use_lora", False):
-            from modules.kanlora_layer import LoRAKAN
+            from modules.lorakan_layer import LoRAKAN
             # LoRAKAN-MLP network.
-            print("Using LoRA-KAN-NLP network")
-            lora_config = LoraConfig(r=32, lora_alpha=64, target_modules=["base_weight"], lora_dropout=0.1, inference_mode=False, bias="none")
-            self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=lora_config)
+            print("Using LoRA-KAN-MLP network")
+            self.interm_kan = LoRAKAN(layers_hidden=[config.hidden_size, config.intermediate_size], lora_config=config.lora_config)
             self.interm_af = F.gelu
-            self.out_kan = LoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=lora_config)
+            self.interm_dropout = nn.Dropout(config.hidden_hybrid_dropout_prob)
+            self.out_kan = LoRAKAN(layers_hidden=[config.intermediate_size, config.hidden_size], lora_config=config.lora_config)
         elif getattr(config, "use_kan", False):
             # KAN-MLP network.
-            print("Using KAN-MLP network")
-            self.interm_kan = KAN(layers_hidden=[config.hidden_size, config.intermediate_size])
-            self.interm_af = F.gelu
-            self.out_kan = KAN(layers_hidden=[config.intermediate_size, config.hidden_size])
+            print("Using KAN network")
+            self.interm_kan = KAN(layers_hidden=[config.hidden_size, int(config.hidden_size*1.5)])
+            self.out_kan = KAN(layers_hidden=[config.hidden_size, int(config.hidden_size*1.5)])
         # LoRA network (if enabled).
         elif getattr(config, "use_lora", False):
             print("Using LoRA network")
@@ -37,13 +36,20 @@ class GPT2Layer(nn.Module):
             self.interm_af = F.gelu
             self.out_dense = LoRALinear(config.intermediate_size, config.hidden_size, lora_config=config.lora_config)
         else:
-            # Feed forward block.
+            # Feed forward block (Base Model).
             self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
             self.interm_af = F.gelu
             self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
             
         self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.out_dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        # Add graph attention if enabled
+        self.use_graph = getattr(config, "use_graph", False)
+        if self.use_graph:
+            print("Using Graph Attention")
+            self.graph_attention = GraphAttentionLayer(config)
+            self.graph_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
     def add(self, input, output, dense_layer, dropout):
         """
@@ -60,6 +66,7 @@ class GPT2Layer(nn.Module):
         Forward pass of the GPT-2 layer.
         - First applies multi-head self-attention with pre-layer normalization.
         - Then applies either the KAN network or a feed-forward network.
+        - If graph attention is enabled, applies it after the feed-forward network.
         - Residual connections are used after each sub-layer.
         """
         # Multi-head self-attention sub-layer.
@@ -73,10 +80,17 @@ class GPT2Layer(nn.Module):
             # For KAN, flatten the sequence dimensions so that the input is 2D.
             batch_size, seq_len, hidden_dim = norm_ff.shape
             flat_norm = norm_ff.view(-1, hidden_dim)
-            ff_output = self.out_kan(self.interm_af(self.interm_kan(flat_norm)))
+            ff_output = self.out_kan((self.interm_kan(flat_norm)))
             ff_output = ff_output.view(batch_size, seq_len, hidden_dim)
         else:
             ff_output = self.out_dense(self.interm_af(self.interm_dense(norm_ff)))
             
         hidden_states = self.add(hidden_states, ff_output, lambda x: x, self.out_dropout)
+
+        # Apply graph attention if enabled
+        if self.use_graph:
+            norm_g = self.graph_layer_norm(hidden_states)
+            graph_output = self.graph_attention(norm_g, hidden_states)
+            hidden_states = self.add(hidden_states, graph_output, lambda x: x, self.out_dropout)
+
         return hidden_states

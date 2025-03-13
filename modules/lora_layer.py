@@ -1,11 +1,8 @@
-# lora_layer.py
-
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from peft import LoraConfig
-
 
 class LoRALinear(nn.Module):
     """
