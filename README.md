@@ -167,7 +167,7 @@ We also acknowledge the authors of the foundational research that our work build
 If you use Learnable-GPT in your research, please cite our work:
 
 ```
-@misc{bernardino2025learnablegpt,
+@misc{2025learnablegpt,
   author = {Bernardino, Marc and Bo, Gabriel and Gu, Justin},
   title = {Learnable-GPT: Enhancing Transformer Models with Adaptive Learning Techniques},
   year = {2025},
